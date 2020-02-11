@@ -6,12 +6,12 @@ from copy import copy
 import pint
 import uncertainties
 
-###### physical units #######
+# physical units #######
 units = pint.UnitRegistry()
-units.auto_reduce_dimensions = False #this doesn't work right
+units.auto_reduce_dimensions = False  # this doesn't work right
 units.errors = pint.errors
 units.default_format = '~P'
-#fix Bq, add ppb units
+# fix Bq, add ppb units
 units.load_definitions([
     "Bq = Hz = Bq = Becquerel",
     "ppb_U = 12 * mBq/kg = ppbU",
@@ -24,20 +24,24 @@ units.load_definitions([
     "dru = 1./(kg * keV * day) = DRU",
     "kky = kg * keV * year = kg_keV_yr",
 ])
-    
 
-#monkey-punch round() capability onto uncertainties, mostly needed for tests
-uncertainties.core.Variable.__round__ = lambda self,n=0: round(self.n,n)
-uncertainties.core.AffineScalarFunc.__round__ = lambda self,n=0: round(self.n,n)
+
+# monkey-punch round() capability onto uncertainties, mostly needed for tests
+def __rnd__(self, n=0):
+    return round(self.n, n)
+
+   
+uncertainties.core.Variable.__round__ = __rnd__
+uncertainties.core.AffineScalarFunc.__round__ = __rnd__
 
 
 def ensure_quantity(value, defunit=None, convert=False):
     """Make sure a variable is a pint.Quantity, and transform if unitless
-    
+
     Args:
         value: The test value
         defunit (str,Unit, Quanty): default unit to interpret as
-        convert (bool): if True, convert the value to the specified unit 
+        convert (bool): if True, convert the value to the specified unit
     Returns:
         Quantity: Value if already Quantity, else Quantity(value, defunit)
     """
@@ -45,17 +49,17 @@ def ensure_quantity(value, defunit=None, convert=False):
         return None
     try:
         qval = units.Quantity(value)
-    except Exception: 
-        #Quantity can't handle '+/-' that comes with uncertainties...
-        valunit = value.rsplit(' ',1)
+    except Exception:
+        # Quantity can't handle '+/-' that comes with uncertainties...
+        valunit = value.rsplit(' ', 1)
         q = valunit[0]
-        u = valunit[1] if len(valunit)>1 else ''
+        u = valunit[1] if len(valunit) > 1 else ''
         if q.endswith(')'):
             q = q[1:-1]
         qval = units.Measurement(uncertainties.ufloat_fromstr(q), u)
-        
-    #make sure the quantity has the same units as default value
-    if (defunit is not None and 
+
+    # make sure the quantity has the same units as default value
+    if (defunit is not None and
         qval.dimensionality != units.Quantity(1*defunit).dimensionality):
         if qval.dimensionality == units.dimensionless.dimensionality:
             qval = units.Quantity(qval.m, defunit)
