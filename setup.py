@@ -10,7 +10,7 @@ setup(name='bgmodelbuilder',
       packages=find_packages(),
       zip_safe=False,
       install_requires=[
-          'pint',
+          'pint==0.9',
           'uncertainties',
       ],
 )
