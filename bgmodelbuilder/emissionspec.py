@@ -168,6 +168,8 @@ class EmissionSpec(Mappable):
         """Get the total emission rate from all associated components 
         and their global weights
         """
+        if len(self.appliedto) == 0:
+            return 0 * units['1/s']
         return sum(self.emissionrate(comp) * comp.gettotalweight() 
                    for comp in self.appliedto)
 
@@ -236,7 +238,9 @@ class CombinedSpec(EmissionSpec):
     def islimit(self,val):
         pass
 
-    def emissionrate(self,component):
+    def emissionrate(self, component):
+        len(self._subspecs) == 0:
+            return 0 * units['1/s']
         return sum(spec.emissionrate(component) for spec in self._subspecs)
         
 
