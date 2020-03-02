@@ -239,7 +239,7 @@ class CombinedSpec(EmissionSpec):
         pass
 
     def emissionrate(self, component):
-        len(self._subspecs) == 0:
+        if len(self._subspecs) == 0:
             return 0 * units['1/s']
         return sum(spec.emissionrate(component) for spec in self._subspecs)
         
