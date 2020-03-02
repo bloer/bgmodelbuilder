@@ -170,6 +170,13 @@ class MongoSimsDB(SimulationsDB):
     def runquery(self, query, projection=None, sort=None):
         pipeline = []
         if query:
+            # allow for lazy querying
+            if not isinstance(query, dict):
+                try:
+                    query = bson.ObjectId(query)
+                except bson.errors.InvalidId:
+                    pass
+                query = {'_id': query}
             pipeline.append({'$match': query})
         if sort:
             pipeline.append({'$sort': sort})
