@@ -10,6 +10,7 @@ from copy import copy
 from collections import namedtuple
 import json
 import logging
+import datetime
 
 from .. import units
 from .simulationsdb import SimulationsDB, SimDataMatch
@@ -202,5 +203,6 @@ class MongoSimsDB(SimulationsDB):
         else:
             raise NotImplementedError("Unhandled format %s",fmt)
 
+        entry['_inserted'] = str(datetime.datetime.utcnow())
         result = self.collection.insert_one(entry)
         return result.inserted_id

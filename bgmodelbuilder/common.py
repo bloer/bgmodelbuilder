@@ -30,7 +30,7 @@ units.load_definitions([
 def __rnd__(self, n=0):
     return round(self.n, n)
 
-   
+
 uncertainties.core.Variable.__round__ = __rnd__
 uncertainties.core.AffineScalarFunc.__round__ = __rnd__
 
@@ -65,15 +65,15 @@ def ensure_quantity(value, defunit=None, convert=False):
             qval = units.Quantity(qval.m, defunit)
         else:
             raise units.errors.DimensionalityError(qval.u, defunit)
-    
+
     return qval.to(defunit) if convert and defunit else qval
-    
+
 
 
 def to_primitive(val, renameunderscores=True, recursive=True,
                  replaceids=True, stringify=(units.Quantity,)):
     """Transform a class object into a primitive object for serialization"""
-    
+
     #if replaceids and hasattr(val, 'id'):
     #    val =  val.id   #id can be a property, so only use _id
     if replaceids and hasattr(val, '_id'):
@@ -88,16 +88,16 @@ def to_primitive(val, renameunderscores=True, recursive=True,
             val =  copy(val.__dict__)
         else: #not sure what this is...
             raise TypeError("Can't convert %s to exportable",type(val))
-            
+
     if recursive:
         if isinstance(val, dict):
-            removeclasses(val, renameunderscores, recursive, replaceids, 
+            removeclasses(val, renameunderscores, recursive, replaceids,
                           stringify)
         elif isinstance(val, (list,tuple)):
-            val = type(val)(to_primitive(sub, renameunderscores, recursive, 
+            val = type(val)(to_primitive(sub, renameunderscores, recursive,
                                          replaceids, stringify) for sub in val)
     return val
-    
+
 
 ####### Functions for dictionary export of complex structures #####
 def removeclasses(adict, renameunderscores=True, recursive=True,
@@ -106,30 +106,30 @@ def removeclasses(adict, renameunderscores=True, recursive=True,
     Args:
         adict (dict): The dictionary to update in place
         renameunderscores (bool): For any key starting with a single underscore,
-            replace with the regular. I.e. '_key'->'key'. Note '_id' will 
+            replace with the regular. I.e. '_key'->'key'. Note '_id' will
             NOT be replaced
         recursive (bool): call removeclasses on any dicts stored as objects
             inside this dictionary
         replaceids (bool): If true, replace any object with an 'id' attribute
             by that object's id
-        stringify (list): list of classes that should be transformed into 
+        stringify (list): list of classes that should be transformed into
             string objects rather than dictionaries
     """
 
     underkeys = []
-    
+
     for key, val in adict.items():
         #check if we need to rename this key
-        if (key != '_id' and hasattr(key,'startswith') and 
+        if (key != '_id' and hasattr(key,'startswith') and
             key.startswith('_') and not key.startswith('__')):
             underkeys.append(key)
-        
-        adict[key] = to_primitive(val, renameunderscores, recursive, 
+
+        adict[key] = to_primitive(val, renameunderscores, recursive,
                                   replaceids, stringify)
-        
+
     if renameunderscores:
         for key in underkeys:
             adict[key[1:]] = adict[key]
             del adict[key]
-    
+
     return adict

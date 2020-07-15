@@ -67,13 +67,13 @@ class SimulationsDB(object):
         mymatches = []
 
         for spec in component.getspecs(deep=True):
-            if spec.emissionrate(component):
-                res = self.genqueries(SimDataMatch(path,spec), findnewdata)
-                if res:
-                    try:
-                        mymatches.extend(res)
-                    except TypeError: #res is not iterable
-                        mymatches.append(res)
+            #if spec.emissionrate(component):
+            res = self.genqueries(SimDataMatch(path,spec), findnewdata)
+            if res:
+                try:
+                    mymatches.extend(res)
+                except TypeError: #res is not iterable
+                    mymatches.append(res)
 
         if hasattr(component,'components'):
             for child in component.components:
