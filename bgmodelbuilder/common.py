@@ -34,6 +34,39 @@ def __rnd__(self, n=0):
 uncertainties.core.Variable.__round__ = __rnd__
 uncertainties.core.AffineScalarFunc.__round__ = __rnd__
 
+# monkey-patch bug when comparing quantities to measurements
+
+def _compare(self, other, op):
+    if not isinstance(other, pint.Quantity):
+        if self.dimensionless:
+            return op(
+                self._convert_magnitude_not_inplace(self.UnitsContainer()), other
+            )
+        elif pint.quantity.zero_or_nan(other, True):
+            # Handle the special case in which we compare to zero or NaN
+            # (or an array of zeros or NaNs)
+            if self._is_multiplicative:
+                # compare magnitude
+                return op(self._magnitude, other)
+            else:
+                # compare the magnitude after converting the
+                # non-multiplicative quantity to base units
+                if self._REGISTRY.autoconvert_offset_to_baseunit:
+                    return op(self.to_base_units()._magnitude, other)
+                else:
+                    raise pint.OffsetUnitCalculusError(self._units)
+        else:
+            raise ValueError("Cannot compare Quantity and {}".format(type(other)))
+
+    if self._units == other._units:
+        return op(self._magnitude, other._magnitude)
+    if self.dimensionality != other.dimensionality:
+        raise pint.DimensionalityError(
+            self._units, other._units, self.dimensionality, other.dimensionality
+        )
+    return op(self.to_root_units().magnitude, other.to_root_units().magnitude)
+
+pint.Quantity.compare = _compare
 
 def ensure_quantity(value, defunit=None, convert=False):
     """Make sure a variable is a pint.Quantity, and transform if unitless
@@ -71,7 +104,7 @@ def ensure_quantity(value, defunit=None, convert=False):
 
 
 def to_primitive(val, renameunderscores=True, recursive=True,
-                 replaceids=True, stringify=(units.Quantity,)):
+                 replaceids=True, stringify=(pint.Quantity,)):
     """Transform a class object into a primitive object for serialization"""
 
     #if replaceids and hasattr(val, 'id'):

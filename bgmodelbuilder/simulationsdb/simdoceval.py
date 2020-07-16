@@ -58,7 +58,7 @@ class SimDocEval(abc.ABC):
             try:
                 return result / match.livetime
             except ZeroDivisionError:
-                log.warnking("SimDataMatch found with 0 livetime %s %s",
+                log.warning("SimDataMatch found with 0 livetime %s %s",
                              match.id, match.query)
                 return result / (1e-6*units.second)
         return result
