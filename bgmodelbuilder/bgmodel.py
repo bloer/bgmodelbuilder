@@ -13,7 +13,7 @@ from __future__ import (absolute_import, division,
 #from builtins import super
 
 import copy
-import uuid
+from shortuuid import uuid
 
 from .mappable import Mappable
 from .component import buildcomponentfromdict, Assembly, BaseComponent
@@ -106,7 +106,7 @@ class BgModel(Mappable):
         """ Make sure that obj has an _id attribute and add it to registry
         """
         if not hasattr(obj,'_id'):
-            obj._id = str(uuid.uuid4())
+            obj._id = uuid()
         if obj._id not in registry:
             registry[obj._id] = obj
         elif registry[obj._id] != obj:

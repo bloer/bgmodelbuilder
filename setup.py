@@ -13,5 +13,6 @@ setup(name='bgmodelbuilder',
           'pint',
           'uncertainties',
           'numpy',
+          'shortuuid',
       ],
 )
