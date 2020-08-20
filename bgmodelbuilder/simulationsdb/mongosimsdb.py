@@ -208,7 +208,7 @@ class MongoSimsDB(SimulationsDB):
 
         entry['_inserted'] = str(datetime.datetime.utcnow())
         result = self.collection.insert_one(entry)
-        return result.inserted_id
+        return str(result.inserted_id)
 
     def __str__(self):
         return f"MongoSimsDB({self.collection})"
