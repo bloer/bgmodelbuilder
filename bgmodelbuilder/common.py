@@ -10,7 +10,7 @@ import uncertainties
 units = pint.UnitRegistry()
 units.auto_reduce_dimensions = False  # this doesn't work right
 units.errors = pint.errors
-units.default_format = '~P'
+units.default_format = '~gP'
 # fix Bq, add ppb units
 units.load_definitions([
     "Bq = Hz = Bq = Becquerel",
@@ -101,10 +101,26 @@ def ensure_quantity(value, defunit=None, convert=False):
 
     return qval.to(defunit) if convert and defunit else qval
 
+class _Stringify(object):
+    """ Convert objects to strings so that they can be reconstructed later
+    Currently only applies to pint Quantities
+    """
+
+    @staticmethod
+    def appliesto(val):
+        return isinstance(val, pint.Quantity)
+
+    @staticmethod
+    def stringify(val):
+        return _Stringify.stringify_quantity(val)
+
+    @staticmethod
+    def stringify_quantity(val):
+        return "{} {:~P}".format(repr(val.m), val.u)
 
 
 def to_primitive(val, renameunderscores=True, recursive=True,
-                 replaceids=True, stringify=(pint.Quantity,)):
+                 replaceids=True):
     """Transform a class object into a primitive object for serialization"""
 
     #if replaceids and hasattr(val, 'id'):
@@ -115,8 +131,8 @@ def to_primitive(val, renameunderscores=True, recursive=True,
     elif inspect.getmodule(val): #I think this tests for non-builtin classes
         if hasattr(val, 'todict'): #has a custom conversion
             val =  val.todict()
-        elif isinstance(val, stringify):
-            val =  str(val)
+        elif _Stringify.appliesto(val):
+            val =  _Stringify.stringify(val)
         elif hasattr(val, '__dict__'): #this is probably going to break lots
             val =  copy(val.__dict__)
         else: #not sure what this is...
@@ -124,17 +140,16 @@ def to_primitive(val, renameunderscores=True, recursive=True,
 
     if recursive:
         if isinstance(val, dict):
-            removeclasses(val, renameunderscores, recursive, replaceids,
-                          stringify)
+            removeclasses(val, renameunderscores, recursive, replaceids)
         elif isinstance(val, (list,tuple)):
             val = type(val)(to_primitive(sub, renameunderscores, recursive,
-                                         replaceids, stringify) for sub in val)
+                                         replaceids) for sub in val)
     return val
 
 
 ####### Functions for dictionary export of complex structures #####
 def removeclasses(adict, renameunderscores=True, recursive=True,
-                  replaceids=True, stringify=(units.Quantity,)):
+                  replaceids=True):
     """Transform all custom class objects in the dict to plain dicts
     Args:
         adict (dict): The dictionary to update in place
@@ -145,8 +160,6 @@ def removeclasses(adict, renameunderscores=True, recursive=True,
             inside this dictionary
         replaceids (bool): If true, replace any object with an 'id' attribute
             by that object's id
-        stringify (list): list of classes that should be transformed into
-            string objects rather than dictionaries
     """
 
     underkeys = []
@@ -158,7 +171,7 @@ def removeclasses(adict, renameunderscores=True, recursive=True,
             underkeys.append(key)
 
         adict[key] = to_primitive(val, renameunderscores, recursive,
-                                  replaceids, stringify)
+                                  replaceids)
 
     if renameunderscores:
         for key in underkeys:

@@ -111,20 +111,19 @@ class EmissionSpec(Mappable):
         return rate
 
     def getratestr(self, sigfigs=None):
-        if self.rate is None:
+        rate = self.ratewitherr
+        if rate is None:
             return "undefined"
         try:
             res=""
             if self.islimit:
                 res += "<"
             format = (".%dg"%sigfigs) if sigfigs else "g"
-            if isinstance(self.rate, units.Quantity):
+            if isinstance(rate, (units.Quantity, units.Measurement)):
                 format = ":~"+format+"P"
             else:
                 format = ":"+format
-            res += ("{"+format+"}").format(self.rate)
-            if self.err:
-                res += " +/- {:.2g}%".format(self.err*100.)
+            res += ("{"+format+"}").format(rate)
             return res
         except Exception as e:
             return "error: "+str(e)
