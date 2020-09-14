@@ -4,7 +4,9 @@ Common functions and utility classes shared by other units
 import inspect
 from copy import copy
 import pint
+from pint.numpy_func import implements, unwrap_and_wrap_consistent_units
 import uncertainties
+import numpy as np
 
 # physical units #######
 units = pint.UnitRegistry()
@@ -67,6 +69,12 @@ def _compare(self, other, op):
     return op(self.to_root_units().magnitude, other.to_root_units().magnitude)
 
 pint.Quantity.compare = _compare
+
+# implement array_equal for quantities
+@implements("array_equal", "function")
+def _array_equal(*args, **kwargs):
+    arrays, output_wrap = unwrap_and_wrap_consistent_units(*args)
+    return np.array_equal(*arrays)
 
 def ensure_quantity(value, defunit=None, convert=False):
     """Make sure a variable is a pint.Quantity, and transform if unitless
