@@ -70,13 +70,15 @@ class BgModel(Mappable):
 
         return res
 
-    def getsimdata(self, component=None, spec=None, rootspec=None):
+    def getsimdata(self, component=None, spec=None, rootspec=None,
+                   rootcomponent=None):
         """Get all simdata, optionally filtered by component or spec
         Args:
             component (BaseComponent): Component to filter against
                                        (leaf-level only)
             spec (EmissionSpec): Spec to filter for, must match exactly
             rootspec (EmissionSpec): Root spect to filter for
+            rootcomponrnt (Assembly): Accept all subcomponents of base
         Returns:
             matches: generator expression or list of matching SimDataMatch
                      objects
@@ -88,6 +90,8 @@ class BgModel(Mappable):
             res = (m for m in res if m.spec == spec )
         if rootspec is not None:
             res = (m for m in res if m.spec.getrootspec() == rootspec)
+        if rootcomponent is not None:
+            res = (m for m in res if rootcomponent.isparentof(m.component, deep=True))
         return list(res)
 
     def getspecs(self, rootonly=True):
