@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='bgmodelbuilder',
-      version='0.3.2',
+      version='0.4',
       description='Tools for building radioactive background models',
       url='http://github.com/bloer/bgmodelbuilder',
       author='Ben Loer',
