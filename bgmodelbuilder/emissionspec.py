@@ -225,8 +225,11 @@ class CombinedSpec(EmissionSpec):
 
     @property
     def err(self):
+        rate = self.rate
+        if not rate:
+            return 0
         return (sum((spec.err*spec.rate)**2 for spec in self._subspecs)**0.5
-                / self.rate).m
+                / rate).m
 
     @property
     def islimit(self):
