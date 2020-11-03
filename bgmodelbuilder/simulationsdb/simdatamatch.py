@@ -13,7 +13,7 @@ import operator
 import copy
 
 from ..mappable import Mappable
-from ..common import to_primitive, ensure_quantity
+from ..common import to_primitive, ensure_quantity, units
 from ..component import Placement
 
 
@@ -202,6 +202,26 @@ class SimDataMatch(Mappable):
     def todict(self):
         mydict = copy.copy(self.__dict__)
         return to_primitive(mydict)
+
+def netlivetime(matches):
+    """ Calculate the net effective livetime of multiple queries that all share
+    the same dataset. This will ONLY work if the livetime is directly
+    proportional to 1/emissiorate
+    Args:
+        matches (list): list of SimDataMatch objects
+    Returns:
+        pint.Quantity for livetime. If any livetime is undefined or emissionrate
+            is zero, will return 0
+    """
+    if len(matches) == 1:
+        return matches[0].livetime
+
+    try:
+        net = (sum(m.livetime * m.emissionrate for m in matchs) /
+               sum(m.emissionrate for m in matches))
+    except Exception:
+        net = 0*units.year
+    return net
 
 
 def buildmatchfromdict(args):
