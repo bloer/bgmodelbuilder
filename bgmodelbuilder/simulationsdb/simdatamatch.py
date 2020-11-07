@@ -50,6 +50,13 @@ class AssemblyPath(list):
         # we've passed all the checks, so go ahead
         super().append(other)
 
+    @property
+    def components(self):
+        """ Get the list of components, rather than Placements """
+        if not self:
+            return []
+        return [self[0].parent] + [entry.component for entry in self]
+
     # do I need to override extend?
     def __add__(self, other):
         newpath = copy.copy(self)

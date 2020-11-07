@@ -363,6 +363,12 @@ class RadioactiveContam(EmissionSpec):
     def __repr__(self):
         return "RadioactiveContam('%s',%s)"%(self.name,self.getratestr())
 
+    def todict(self):
+        # get rid of 'isotope' if not needed
+        d = super().todict()
+        if not self.isotope or self.isotope == self.name:
+            del d['isotope']
+        return d
 
 
 

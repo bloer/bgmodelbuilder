@@ -28,24 +28,22 @@ class BoundSpec(object):
     Args:
         spec (EmissionSpec): Spec to attach to component
         querymod:  Additional info for simulationsDB matching
-        simdata:   List of SimDataRequest objects for binding simulation 
-                   data to spec's subspecs
     """
     def __init__(self, spec=None, querymod=None):
         self.spec = spec
-        self.querymod = querymod 
-                
-    def __eq__(self, other): 
+        self.querymod = querymod
+
+    def __eq__(self, other):
         if hasattr(other, 'spec'):
             return self.spec == other.spec
         return self.spec == other
-        
+
     def todict(self):
         return dict(
             spec = self.spec,
             querymod = self.querymod,
         )
-        
+
     @classmethod
     def _childattr(cls, attr):
         """Create an attribute for this class that refers to child"""
@@ -53,19 +51,19 @@ class BoundSpec(object):
             return getattr(self.spec,attr,None)
 
         setattr(cls, attr, property(get))
-    
+
     _copyattrs = ('name','distribution','category','rate','getratestr','id')
-    
+
 for attr in BoundSpec._copyattrs:
     BoundSpec._childattr(attr)
-    
-    
+
+
 
 class BaseComponent(Mappable):
     """Base class for Components and Assemblies, defines useful functions"""
-    def __init__(self, name=None, description=None, 
-                 comment=None, moreinfo=None, 
-                 specs=[], querymod=None, **kwargs) : 
+    def __init__(self, name=None, description=None,
+                 comment=None, moreinfo=None,
+                 specs=[], querymod=None, **kwargs) :
         """Create a new BaseComponent.
         Args:
             name (str): a short, hopefully unique name for the component
@@ -73,10 +71,10 @@ class BaseComponent(Mappable):
             comment (str): describe current implementation or status
             moreinfo (dict): dictionary of additional metadata
             specs (list): EmissionSpecifications attached to this component
-                Each item in the list may be either a EmissionSpecification 
+                Each item in the list may be either a EmissionSpecification
                 or a (EmissionSpecification, querymod) pair
             querymod (dict): modify the default query to find ConversionEffs
-                for all specs associated with this component. See the 
+                for all specs associated with this component. See the
                 specific DB implementation for the expected format
         """
         super().__init__(**kwargs)
@@ -86,9 +84,9 @@ class BaseComponent(Mappable):
         self.moreinfo = moreinfo or {}
         self.placements = set()
         #basic bookkeeping and descriptive stuff
-        self.querymod = querymod 
+        self.querymod = querymod
         self.specs = specs
-        
+
 
     @property
     def specs(self):
@@ -105,17 +103,17 @@ class BaseComponent(Mappable):
 
     def __str__(self):
         return "%s('%s')"%(type(self).__name__, self.name)
-    
+
     def __repr__(self):
         return "%s('%s')"%(type(self).__name__, self.id)
-    
+
     def clone(self, newname=None):
         myclone = super().clone(newname, deep=False)
         # make new boundspec objects, remove simdata hits
         myclone.specs = [copy(spec) for spec in self.specs]
         myclone.placements = set()
         return myclone
-        
+
     def addspec(self, spec, querymod=None, index=None):
         if index is None:
             index = len(self.specs)
@@ -132,7 +130,7 @@ class BaseComponent(Mappable):
         return spec
 
     def delspec(self, spec):
-        """Remove this spec from our reference. type(spec) can be a 
+        """Remove this spec from our reference. type(spec) can be a
         EmissionSpec or index"""
         if type(spec) is int:
             #treat as index
@@ -142,11 +140,11 @@ class BaseComponent(Mappable):
             spec.appliedto.remove(self)
 
     def getspecs(self, deep=False, children=False):
-        """Find specs associated with this component. 
+        """Find specs associated with this component.
         Args:
-            deep (bool): If False (default), only return top-level specs. 
-                         Otherwise, also include subspecs 
-            children (bool): If True and this component is an assembly, 
+            deep (bool): If False (default), only return top-level specs.
+                         Otherwise, also include subspecs
+            children (bool): If True and this component is an assembly,
                              also include subcomponents
         """
         result = [bs.spec for bs in self._specs]
@@ -157,10 +155,10 @@ class BaseComponent(Mappable):
         # can we assume they are unique?
         #return set(result) # this messes up order!
         return result
-            
+
     def gettotalweight(self, fromroot=None):
         """Get the total weight (usually number of) placed components
-        Will be 0 if not placed anywhere in tree or only belong to unplaced 
+        Will be 0 if not placed anywhere in tree or only belong to unplaced
         assemblies
         Args:
             fromroot (Assembly): only count weight belonging to this assembly
@@ -182,18 +180,18 @@ class BaseComponent(Mappable):
                                 and returns true or false
         Returns:
             passing (list): list of (component, spec, weight) tuples that
-                            pass the selector function 
+                            pass the selector function
                             (for leaf components comp==self and weight==1)
         """
         if not selector:
             selector = selectany
-        return [(self,s,1) for s in self.getspecs(deep=True) 
+        return [(self,s,1) for s in self.getspecs(deep=True)
                 if selector(self,s)]
-    
+
     def isparentof(self, component, deep=False):
         """ Are we the parent component? This is a leaf, so only if it is us """
         return component is self
-    
+
     def getcomponents(self, deep=False, withweight=False, merge=True):
         """Get list of subcomponents. Makes it easier to do things recursively
         on assembly trees if all components have this function
@@ -212,7 +210,7 @@ class BaseComponent(Mappable):
                            .format(spec.name, spec.id))
 
         return result
-    
+
     def todict(self):
         """Export this object to a dictionary suitable for storage/transmission
         """
@@ -221,16 +219,16 @@ class BaseComponent(Mappable):
         #placements may not have IDs, so delete and assume they'll be rebuilt
         del result['placements']
         return result
-        
+
 class Component(BaseComponent):
     """Helper class to store list of component physical parameters
 
-    All dimensional parameters will be cast to pint.Quantity's if bare numbers 
-    are passed, with default SI units (kg, m, s). 
-    All attributes are optional 
-    
+    All dimensional parameters will be cast to pint.Quantity's if bare numbers
+    are passed, with default SI units (kg, m, s).
+    All attributes are optional
+
     Attributes: are same as init args
-    
+
 
     """
     def __init__(self, name=None, material=None, mass=None, volume=None,
@@ -239,15 +237,15 @@ class Component(BaseComponent):
         """Constructor
 
         If `surface_in` or `surface_out` are given, `surface` is ignored
-        
+
         Args:
             material (str): physical material (e.g. wood, copper)
             mass (Quantity): mass of material. interpreted as kg if unitless
             volume (Quantity): volume of material, interpreted as m^3
-            surface (Quantity): total surface area. interpted as m^2  
-            surface_in (Quantity): inner surface area (e.g. cryostat) 
+            surface (Quantity): total surface area. interpted as m^2
+            surface_in (Quantity): inner surface area (e.g. cryostat)
             surface_out (Quantity): same as inner, but for outer surface
-            surface_interior (Quantity): total covered area of pieces used to 
+            surface_interior (Quantity): total covered area of pieces used to
                 construct a monolithic component e.g. bricks of lead
                 Note: Not actually used in forms!!!
         """
@@ -268,17 +266,17 @@ class Component(BaseComponent):
         return self._material
     @property
     def mass(self):
-        return self._mass        
+        return self._mass
     @property
     def volume(self):
         return self._volume
     @property
     def surface_in(self):
         return self._surface_in
-    @property 
+    @property
     def surface_out(self):
         return self._surface_out
-    @property 
+    @property
     def surface_interior(self):
         return self._surface_interior
     @property
@@ -304,14 +302,14 @@ class Component(BaseComponent):
     @surface_interior.setter
     def surface_interior(self, surface_interior):
         self._surface_interior = ensure_quantity(surface_interior, 'm^2')
-    
 
-        
+
+
 class Placement(object):
-    """A class representing an instance of a component placed within an 
+    """A class representing an instance of a component placed within an
     Assembly. For example, the same resistor might be used in different places
     in an experiment, and so will need to be associated to different simulation
-    datasets. This lets us avoid copying components. 
+    datasets. This lets us avoid copying components.
     """
     # TODO: give placements names!
     def __init__(self, parent=None, component=None, weight=1, querymod=None,
@@ -320,12 +318,12 @@ class Placement(object):
             parent (Assembly): assembly in which we're being placed
                 Unlike components, placements should be unique
             component (Component): the component or assembly to place here
-            weight (numeric): Usually, how many of this component, but could 
+            weight (numeric): Usually, how many of this component, but could
                 be fractional in some cases
             querymod (dict): modifier to DB query to locate sim datasets
-            name (str): Name associated with this particular placement. By 
+            name (str): Name associated with this particular placement. By
                         default will adopt the name of the component
-            
+
         """
         self.parent = parent
         self.component = component
@@ -375,14 +373,13 @@ class Placement(object):
             index=None
 
         return (pid, index)
-        
 
 
 class Assembly(BaseComponent):
     """Assembly of multiple components"""
     def __init__(self, name=None, components=[], **kwargs):
         """Create a new assembly of multiple components
-        
+
         Args:
             components (list): list of Components or Assemblies owned by this
                 object. Can be bare Components or tuples, dictionary of
@@ -399,7 +396,7 @@ class Assembly(BaseComponent):
 
     @components.setter
     def components(self, components):
-        """construct the list of components from list of comps or (comp,weight) 
+        """construct the list of components from list of comps or (comp,weight)
         pairs. Can also be bare objects
         """
         self._components = []
@@ -409,11 +406,11 @@ class Assembly(BaseComponent):
     def clone(self):
         myclone = super().clone()
         myclone.components = [copy(plcmnt) for plcmnt in self.components]
-        return myclone 
+        return myclone
 
     def addcomponent(self, placement, index=None):
         """Add a new component directly to this assembly
-        the argument "placement" can take many forms: 
+        the argument "placement" can take many forms:
            Component/Assembly to attache
            list or tuple of positional arguments to Placement
            dict of kwarg arguments to Placement
@@ -421,7 +418,7 @@ class Assembly(BaseComponent):
         """
         if isinstance(placement, BaseComponent):
             placement = Placement(self, placement)
-        elif isinstance(placement, Placement): 
+        elif isinstance(placement, Placement):
             placement.parent = self
         elif type(placement) in (tuple, list):
             placement = Placement(self, *placement)
@@ -455,11 +452,11 @@ class Assembly(BaseComponent):
             del self._components[comp]
         if len(self._components) != before-1:
             log.warning("Unable to delete component %s", comp)
-            
+
     #functions for inspecting the tree of subcomponents
     def getcomponents(self, deep=False, withweight=False, merge=True):
         """Get all components belonging directly or indirectly to this assembly
-        
+
         Args:
             deep (bool): if true, include components of nested Assemblies
             withweight (bool): if true, return a list of (comp,weight) pairs,
@@ -468,7 +465,7 @@ class Assembly(BaseComponent):
                 at multiple leaves in the tree
         """
         if not deep:
-            return [(p.component, p.weight) if withweight else p.component 
+            return [(p.component, p.weight) if withweight else p.component
                     for p in self._components]
         allcomp = []
         for placement in self._components:
@@ -488,16 +485,16 @@ class Assembly(BaseComponent):
                     temp[comp] = 0
                 temp[comp] += weight
             allcomp = [(c,w) if withweight else c for c,w in temp.items()]
-            
+
         return allcomp
 
     def getchildweight(self, child, deep=False):
         """Get the total weight of child component"""
-        return sum(w for c,w in self.getcomponents(deep=deep, 
+        return sum(w for c,w in self.getcomponents(deep=deep,
                                                    withweight=True,
                                                    merge=True)
                    if c==child)
-        
+
     def isparentof(self, component, deep=False):
         """Is this component within our owned tree?"""
         if component is self:
@@ -508,7 +505,7 @@ class Assembly(BaseComponent):
             if deep and sub.isparentof(component, deep=deep):
                 return True
         return False
-    
+
     def passingselector(self, selector=None):
         """ Override leaf-level method to add component weights """
         if not selector:
@@ -521,20 +518,20 @@ class Assembly(BaseComponent):
         #except:
         #    #interpret exception as not wanting a None type so ignore
         #    pass
-        
+
         #loop through children
         passing = []
         for comp, weight in self.getcomponents(withweight=True, deep=False):
             childpass = comp.passingselector(selector)
             passing.extend([(c,s,w*weight) for c,s,w in childpass])
         return passing
-    
+
     def gethierarchyto(self,component, placements=False):
         """Find how this component is related to a parent
         Returns None if component can not be reached or a list of tuples
-        containing all possible routes. 
-        If `placements` is True, return tuple of placements instead of 
-        components. 
+        containing all possible routes.
+        If `placements` is True, return tuple of placements instead of
+        components.
         """
         if not self.isparentof(component,deep=True):
             return None
@@ -549,16 +546,16 @@ class Assembly(BaseComponent):
                 for subtree in subcomp.gethierarchyto(component, placements):
                     result.append(mytree+subtree)
         return result
-        
+
     def getspecs(self, deep=False, children=False):
         result = super().getspecs(deep=deep)
-        
+
         if children:
             for comp in self.getcomponents(deep=True, withweight=False):
                 result.extend(comp.getspecs(deep=deep, children=children))
         # may have overlaps, so need to filter
         return set(result)
-    
+
     @property
     def material(self):
         return None
@@ -566,31 +563,31 @@ class Assembly(BaseComponent):
     #there has got to be a smarter way to do all of this...
     def sumoverchildren(self,attr):
         """Utility function to ease the overrides below"""
-        return sum(c.__getattribute__(attr)*w 
+        return sum(c.__getattribute__(attr)*w
                    for c,w in self.getcomponents(withweight=True, deep=False))
 
     @property
     def mass(self):
-        return self.sumoverchildren('mass')        
+        return self.sumoverchildren('mass')
     @property
     def volume(self):
         return self.sumoverchildren('volume')
     @property
     def surface_in(self):
         return self.sumoverchildren('surface_in')
-    @property 
+    @property
     def surface_out(self):
         return self.sumoverchildren('surface_out')
-    @property 
+    @property
     def surface_interior(self):
         return self.sumoverchildren('surface_interior')
     @property
     def surface(self):
         return self.sumoverchildren('surface')
 
-    
-        
-        
+
+
+
 def buildcomponentfromdict(args):
     """Construct a Component or Assembly from a dict"""
     classname = args.pop('__class__',None)

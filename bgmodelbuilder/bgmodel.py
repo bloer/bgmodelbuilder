@@ -78,7 +78,7 @@ class BgModel(Mappable):
                                        (leaf-level only)
             spec (EmissionSpec): Spec to filter for, must match exactly
             rootspec (EmissionSpec): Root spect to filter for
-            rootcomponrnt (Assembly): Accept all subcomponents of base
+            rootcomponent (Assembly): Accept all subcomponents of base
         Returns:
             matches: generator expression or list of matching SimDataMatch
                      objects
@@ -91,7 +91,7 @@ class BgModel(Mappable):
         if rootspec is not None:
             res = (m for m in res if m.spec.getrootspec() == rootspec)
         if rootcomponent is not None:
-            res = (m for m in res if rootcomponent.isparentof(m.component, deep=True))
+            res = (m for m in res if rootcomponent in m.assemblyPath.components)
         return list(res)
 
     def getspecs(self, rootonly=True):
@@ -114,12 +114,7 @@ class BgModel(Mappable):
         if obj._id not in registry:
             registry[obj._id] = obj
         elif registry[obj._id] != obj:
-            print(("Error trying to register object with name %s;",
-                   "component with ID %s already registered!")
-                   %(getattr(obj,'name',''), obj._id))
-            #now what?
-            raise ValueError(obj._id)
-
+            raise KeyError(f"Object with ID {obj._id} already registered")
 
     def connectreferences(self, component):
         """Convert any raw IDs in a component to actual objects"""
@@ -139,13 +134,13 @@ class BgModel(Mappable):
 
         if not comp:
             comp = self.assemblyroot
-            #do we need to empty the registries at some point?
+            #rebuild the registries from scratch
+            #self.components.clear()
+            #self.specs.clear()
+
 
         # make sure that this component has an ID and is in the registry
         self.registerobject(comp, self.components);
-
-        # make sure all ID references are actual objects
-        self.connectreferences(comp)
 
         # make sure all of its specs are in the registery too
         # also make sure the reverse reference to owned component exists
@@ -157,12 +152,8 @@ class BgModel(Mappable):
         for spec in comp.getspecs(deep=True, children=False):
             self.registerobject(spec, self.specs)
 
-        # now recurse for subcomponents in assembly
         if hasattr(comp, 'components'):
             for placement in comp.components:
-                # these should both be true already:
-                placement.parent = comp
-                placement.component.placements.add(placement)
                 self.sanitize(placement.component)
 
         # miscellaneous checks
@@ -170,6 +161,45 @@ class BgModel(Mappable):
             # make sure unplaced components are handled too
             for comp in self.get_unplaced_components():
                 self.sanitize(comp)
+
+            # check to see if simdata refers to nonexistent entries
+            for key, match in list(self.simdata.items()):
+                if match.spec not in match.component.getspecs(deep=True):
+                    del self.simdata[key]
+                    continue
+                for plc in match.assemblyPath:
+                    if not plc.parent.isparentof(plc.component):
+                        del self.simdata[key]
+                        break
+
+    def delcomponent(self, compid):
+        """ delete component with id `compid` completely """
+        component = self.components.get(compid)
+        if not component:
+            return
+
+        # remove all placements
+        for placement in component.placements:
+            if placement.parent:
+                placement.parent.delcomponent(placement)
+        # remove all sim data hits
+        for match in self.getsimdata(rootcomponent=component):
+            del self.simdata[match.id]
+        # remove from the registry
+        del self.components[compid]
+
+    def delspec(self, specid):
+        """ delete emissionspec with id `specid` completely """
+        spec = self.specs.get(specid)
+        if not spec:
+            return
+
+        #remove all references
+        for comp in list(spec.appliedto):
+            comp.delspec(spec)
+        for match in self.getsimdata(rootspec=spec):
+            del self.simdata[match.id]
+        del self.specs[spec.id]
 
 
     @staticmethod
@@ -198,6 +228,12 @@ class BgModel(Mappable):
         {key: self.pack(comp) for key, comp in self.components.items()}
         result['simdata'] = \
         {key: self.pack(match) for key, match in self.simdata.items()}
+        # first entry in assembly paths is always assemblyroot, so can remove
+        for match in result['simdata'].values():
+            try:
+                match['assemblyPath'].pop(0)
+            except IndexError:
+                pass
         return result
 
     @classmethod
@@ -239,7 +275,12 @@ class BgModel(Mappable):
             if match.spec:
                 match.spec = model.specs[match.spec]
             if match.assemblyPath:
-                match.assemblyPath[0] = model.components[match.assemblyPath[0]]
+                try:
+                    root = match.assemblyPath[0]
+                    match.assemblyPath[0] = model.components[root]
+                except KeyError:
+                    # this is the compact version
+                    match.assemblyPath.insert(0, model.assemblyroot)
                 match.assemblyPath = AssemblyPath.construct(match.assemblyPath)
 
 
