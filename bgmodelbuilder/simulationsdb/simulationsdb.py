@@ -120,8 +120,8 @@ class SimulationsDB(object):
 
         if newmatch.livetime != oldmatch.livetime:
             newmatch.addstatus("livetimechanged")
-            if (newmatch.livetime > oldmatch.livetime or
-                oldmatch.livetime is None):
+            if (oldmatch.livetime is None or
+                newmatch.livetime > oldmatch.livetime):
                 newmatch.addstatus("livetimeadded")
             elif (newmatch.livetime < oldmatch.livetime or
                   newmatch.livetime is None):
