@@ -13,7 +13,7 @@ import operator
 import copy
 
 from ..mappable import Mappable
-from ..common import to_primitive, ensure_quantity, units
+from ..common import to_primitive, ensure_quantity, units, stripdefaults
 from ..component import Placement
 
 
@@ -208,7 +208,11 @@ class SimDataMatch(Mappable):
 
     def todict(self):
         mydict = copy.copy(self.__dict__)
-        return to_primitive(mydict)
+        result = to_primitive(mydict)
+        stripdefaults(result, ['dataset', 'rawerate'],
+                      dict(weight=1, livetime="0 s", status="nodata"))
+        # todo: rawerate is a cached value. Should we just recalculate?
+        return result
 
 def netlivetime(matches):
     """ Calculate the net effective livetime of multiple queries that all share

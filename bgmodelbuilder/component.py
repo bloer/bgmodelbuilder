@@ -10,7 +10,7 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import super
 
-from .common import units, ensure_quantity, removeclasses
+from .common import units, ensure_quantity, removeclasses, stripdefaults
 from .mappable import Mappable
 
 from collections import OrderedDict
@@ -39,10 +39,8 @@ class BoundSpec(object):
         return self.spec == other
 
     def todict(self):
-        return dict(
-            spec = self.spec,
-            querymod = self.querymod,
-        )
+        return stripdefaults(dict(spec = self.spec, querymod = self.querymod),
+                             ['querymod'])
 
     @classmethod
     def _childattr(cls, attr):
@@ -218,6 +216,10 @@ class BaseComponent(Mappable):
         result['__class__'] = type(self).__name__
         #placements may not have IDs, so delete and assume they'll be rebuilt
         del result['placements']
+        stripdefaults(result, list(result.keys()),
+                      dict(mass="0 kg", volume="0 cm³", surface_in="0 cm²",
+                           surface_out="0 cm²", surface_interior="0 cm²")
+                     )
         return result
 
 class Component(BaseComponent):
@@ -354,11 +356,10 @@ class Placement(object):
 
     def todict(self):
         result = removeclasses(copy(self.__dict__))
-        #don't save 'name' unless it is different from component
-        if self.name == getattr(self.component,'name'):
-            del result['name']
         #replace objects with ID references
         del result['parent'] #this gets reset on construction
+        stripdefaults(result, ['querymod', 'name'],
+                      dict(weight=1, name=getattr(self.component, 'name')))
         return result
 
     def tocompact(self):

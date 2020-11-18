@@ -11,7 +11,7 @@ from __future__ import (absolute_import, division,
 from builtins import super
 
 from math import log,exp
-from .common import units, ensure_quantity, removeclasses
+from .common import units, ensure_quantity, removeclasses, stripdefaults
 from .mappable import Mappable
 from copy import copy
 from math import sqrt
@@ -205,6 +205,9 @@ class EmissionSpec(Mappable):
         result.pop('_appliedto', None)
         result.pop('parent', None)
         result = removeclasses(result, replaceids=False)
+        stripdefaults(result, list(result.keys()),
+                      dict(category=result['__class__'],
+                           distribution=self._default_distribution))
         return result
 
 
@@ -424,6 +427,13 @@ class RadonExposure(RadioactiveContam):
     def __repr__(self):
         return "RadonExposure(%s)"%(self.getfullspec())
 
+    def todict(self):
+        result = super().todict()
+        stripdefaults(result, [], dict(radonlevel="100.0 Bq/m³", exposure="1 d",
+                                       column_height="10 cm", mode="free",
+                                       distribution="surface", name="Pb210"))
+        return result
+
 
 
 
@@ -502,12 +512,13 @@ class CosmogenicSource(RadioactiveContam):
     def rate(self):
         """Get the average decay rate over the integation interval"""
         tau = self.isotope.halflife / log(2)
-        if self.integration <= 0*units.day:
-            self.integration = tau / 100
+        integration = self.integration
+        if integration <= 0*units.day:
+            integration = tau / 100
         R0 = self.isotope.activationrate * (1-exp(-self.exposure/tau))
         a = self.cooldown
         b = a + self.integration
-        return R0 * (exp(-a/tau) - exp(-b/tau)) * tau/(self.integration)
+        return R0 * (exp(-a/tau) - exp(-b/tau)) * tau/(integration)
 
     @rate.setter
     def rate(self, newrate):
@@ -590,9 +601,10 @@ class CosmogenicActivation(CombinedSpec):
 
     def todict(self):
         result = super().todict()
-        del result['subspecs']
+        result.pop('subspecs', None)
         #this gets calculated automatically
         del result['min_halflife']
+        stripdefaults(result, [], dict(cooldown="0 d", integration="0.01 s"))
         return result
 
 def buildspecfromdict(args):

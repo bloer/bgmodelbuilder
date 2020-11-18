@@ -187,3 +187,30 @@ def removeclasses(adict, renameunderscores=True, recursive=True,
             del adict[key]
 
     return adict
+
+
+def stripdefaults(target, removeempty=list(), removeexact=dict()):
+    """ Make output dicts smaller by removing default entries. Keys are
+    removed from `target` in place
+    Args:
+        target (dict): dictionary to remove entries from
+        removeempty (list): Remove keys in this list from target if the key
+                            tests as false (None, "", [], {}, etc)
+        removeexact (dict): Remove keys in this dict from target if the
+                            correspondong values are equal
+    Returns:
+        target with the keys removed
+    """
+    for key in removeempty:
+        # if val is an np.array, `not` raises an exception
+        try:
+            if not target.get(key, True):
+                del target[key]
+        except Exception:
+            pass
+
+    for key, val in removeexact.items():
+        if target.get(key) == val:
+            del target[key]
+
+    return target
