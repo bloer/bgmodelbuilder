@@ -11,6 +11,7 @@ from collections import namedtuple
 import json
 import logging
 import datetime
+from functools import lru_cache
 
 from .. import units
 from .simulationsdb import SimulationsDB, SimDataMatch
@@ -95,6 +96,32 @@ class MongoSimsDB(SimulationsDB):
                 match.livetime = livetime
         return matches
 
+    @lru_cache(1024)
+    def _eval_single(self, value, dataset):
+        """ Evaluate a single database hit. Separated to give some caching """
+        projection = {}
+        value.project(projection)
+        result = None
+        for entry in dataset:
+            #ID should be an object ID, but don't raise a fuss if not
+            try:
+                entry = bson.ObjectId(entry)
+            except bson.errors.InvalidId:
+                pass
+
+            doc = self.collection.find_one({'_id':entry}, projection)
+            if not doc:
+                #Entry should have been for an existing document, so
+                #something went really wrong here...
+                raise KeyError("No document with ID %s in database"%entry)
+            try:
+                parsed = value.parse(doc)
+                result = parsed if result is None else v.reduce(parsed, result)
+            except Exception as e:
+                log.warning("Caught exception parsing dataset %s: %s", entry, e)
+
+        return result
+
 
     def evaluate(self, values, matches):
         """Sum up each key in values, weighted by livetime.
@@ -110,10 +137,6 @@ class MongoSimsDB(SimulationsDB):
 
         """
         result = [0]*len(values)
-        projection = {}
-        for v in values:
-            v.project(projection)
-
         matches = matches if isinstance(matches,(list, tuple)) else [matches]
         for match in matches:
             dataset = match.dataset
@@ -121,27 +144,22 @@ class MongoSimsDB(SimulationsDB):
                 continue
             if not isinstance(dataset, (list, tuple)):
                 dataset = (dataset,)
+            elif isinstance(dataset, list):
+                dataset = tuple(dataset)
 
-            for entry in dataset:
-                #ID should be an object ID, but don't raise a fuss if not
+            for i, v in enumerate(values):
+                val = self._eval_single(v, dataset)
+                if val is None:
+                    continue
                 try:
-                    entry = bson.ObjectId(entry)
-                except bson.errors.InvalidId:
-                    pass
-
-                doc = self.collection.find_one({'_id':entry}, projection)
-                if not doc:
-                    #Entry should have been for an existing document, so
-                    #something went really wrong here...
-                    raise KeyError("No document with ID %s in database"%entry)
-
-                for i,v in enumerate(values):
-                    try:
-                        val = v.norm(v.parse(doc, match), match)
-                        result[i] = v.reduce(val, result[i])
-                    except Exception as e:
-                        log.warning("Caught exception parsing dataset %s: %s",
-                                    entry, e)
+                    val = v.norm(val, match)
+                except Exception as e:
+                    log.warning("Caught exception normalizing match %s: %e", match.id, e)
+                    val = 0
+                try:
+                    result[i] = v.reduce(val, result[i])
+                except Exception as e:
+                    log.warning("Exception: %s, %s, %s", val, result[i], e)
 
         return result
 

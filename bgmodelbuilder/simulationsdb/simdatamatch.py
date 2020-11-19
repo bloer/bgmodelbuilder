@@ -110,7 +110,7 @@ class SimDataMatch(Mappable):
         self.query = query
         self.weight = weight
         self.dataset = dataset
-        self.livetime = ensure_quantity(livetime, "year")
+        self.livetime = ensure_quantity(livetime or 0, "year")
         self.status = status or ""
         self._rawerate = ensure_quantity(rawerate, "1/day")
 

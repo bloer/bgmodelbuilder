@@ -47,7 +47,7 @@ class SimDocEval(abc.ABC):
     """
     ####### Overridable methods   ##############
     @abc.abstractmethod
-    def parse(self, doc, match):
+    def parse(self, doc):
         pass
 
     def project(self, projection):
@@ -77,15 +77,6 @@ class SimDocEval(abc.ABC):
     @property
     def key(self):
         return self._key()
-
-    def __eq__(self, other):
-        try:
-            return self.key == other.key
-        except AttributeError:
-            return False
-
-    def __hash__(self):
-        return hash(self._key())
 
     def __str__(self):
         return self._key()
@@ -184,7 +175,7 @@ class DirectValue(SimDocEval, UnitsHelper):
         projection[self.val] = True
         return self.projectunit(projection)
 
-    def parse(self, document, match):
+    def parse(self, document):
         #should we just throw an exception if the key is bad?
         result = 0
         try:
@@ -251,7 +242,7 @@ class DirectSpectrum(SimDocEval):
             self.binsunit.projectunit(projection)
         return projection
 
-    def parse(self, document, match):
+    def parse(self, document):
         #should we check that the key returns a list?
         hist = None
         try:
@@ -316,8 +307,8 @@ class SpectrumAverage(DirectSpectrum):
         self.b = b
         self.binwidths = binwidths
 
-    def parse(self, doc, match):
-        return super().parse(doc, match).average(self.a, self.b, self.binwidths)
+    def parse(self, doc):
+        return super().parse(doc).average(self.a, self.b, self.binwidths)
 
 class SpectrumIntegral(DirectSpectrum):
     """Integrate the spectrum over the provided range"""
@@ -327,6 +318,6 @@ class SpectrumIntegral(DirectSpectrum):
         self.b = b
         self.binwidths = binwidths
 
-    def parse(self, doc, match):
-        return super().parse(doc, match).integrate(self.a,self.b,self.binwidths)
+    def parse(self, doc):
+        return super().parse(doc).integrate(self.a,self.b,self.binwidths)
 
