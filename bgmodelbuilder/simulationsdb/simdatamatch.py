@@ -102,7 +102,7 @@ class SimDataMatch(Mappable):
         rawerate (Quantity): Emission rate for this spec before `weight`
     """
     def __init__(self, assemblyPath=None, spec=None, query=None, weight=1,
-                 dataset=None, livetime=None, status=None, rawerate=None,
+                 dataset=None, livetime=0, status=None, rawerate=None,
                  **kwargs):
         super().__init__(**kwargs)
         self.assemblyPath = assemblyPath or AssemblyPath()
@@ -209,7 +209,7 @@ class SimDataMatch(Mappable):
     def todict(self):
         mydict = copy.copy(self.__dict__)
         result = to_primitive(mydict)
-        stripdefaults(result, ['dataset', 'rawerate'],
+        stripdefaults(result, ['dataset', 'rawerate', 'livetime'],
                       dict(weight=1, livetime="0 s", status="nodata"))
         # todo: rawerate is a cached value. Should we just recalculate?
         return result
