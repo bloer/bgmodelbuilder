@@ -140,8 +140,8 @@ class MongoSimsDB(SimulationsDB):
                         val = v.norm(v.parse(doc, match), match)
                         result[i] = v.reduce(val, result[i])
                     except Exception as e:
-                        log.warning("Caught exception parsing match %s: %s",
-                                    match.id, e)
+                        log.warning("Caught exception parsing dataset %s: %s",
+                                    entry, e)
 
         return result
 
