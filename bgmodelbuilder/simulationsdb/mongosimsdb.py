@@ -96,7 +96,7 @@ class MongoSimsDB(SimulationsDB):
                 match.livetime = livetime
         return matches
 
-    @lru_cache(1024)
+    @lru_cache(128)
     def _eval_single(self, value, dataset):
         """ Evaluate a single database hit. Separated to give some caching """
         projection = {}
