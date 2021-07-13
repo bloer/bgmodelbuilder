@@ -228,7 +228,7 @@ def netlivetime(matches):
         return matches[0].livetime
 
     try:
-        net = (sum(m.livetime * m.emissionrate for m in matchs) /
+        net = (sum(m.livetime * m.emissionrate for m in matches) /
                sum(m.emissionrate for m in matches))
     except Exception:
         net = 0*units.year
