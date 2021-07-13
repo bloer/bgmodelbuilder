@@ -51,6 +51,8 @@ class SimDocEval(abc.ABC):
         pass
 
     def project(self, projection):
+        if self.datapro:
+            projection.update(self.datapro)
         return projection
 
     def norm(self, result, match):
@@ -84,11 +86,12 @@ class SimDocEval(abc.ABC):
     def __repr__(self):
         return self._key()
 
-    def __init__(self, label=None, livetimenormed=True,
+    def __init__(self, label=None, livetimenormed=True, datapro=None,
                  *args, **kwargs): #should label be required?
         super().__init__(*args, **kwargs)
         self.label = label
         self.livetimenormed = livetimenormed
+        self.datapro = datapro
 
     @property
     def label(self):
@@ -106,7 +109,14 @@ def splitsubkeys(document, key):
     if not key:
         return None
     for subkey in key.split('.'):
-        document = document[subkey] #throw key error if not there
+        try:
+            document = document[subkey] #throw key error if not there
+        except (TypeError, KeyError):
+            # check if subkey is an integer index
+            try:
+                document = document[int(subkey)]
+            except ValueError:
+                pass
     return document
 
 class UnitsHelper(object):
@@ -173,7 +183,8 @@ class DirectValue(SimDocEval, UnitsHelper):
 
     def project(self, projection):
         projection[self.val] = True
-        return self.projectunit(projection)
+        self.projectunit(projection)
+        return super().project(projection)
 
     def parse(self, document):
         #should we just throw an exception if the key is bad?
@@ -222,7 +233,8 @@ class DirectSpectrum(SimDocEval):
           binsunitkey (str): key in document containing binsunit
           errcalc (func): custom error calculation function, in case units
               are already applied or sqrt(N) is not appropriate
-          scale (float): scale the histogram after applying units
+          scale (float or str): scale the histogram after applying units
+                                if scale == 'bins', scale by 1/binwidth
         """
         #TODO: add option to integrate/average over range
         super().__init__(*args, **kwargs)
@@ -240,7 +252,7 @@ class DirectSpectrum(SimDocEval):
         if self.binskey:
             projection[self.binskey] = True
             self.binsunit.projectunit(projection)
-        return projection
+        return super().project(projection)
 
     def parse(self, document):
         #should we check that the key returns a list?
@@ -289,8 +301,14 @@ class DirectSpectrum(SimDocEval):
                 result = Histogram(uarray(hist.m,err.m)*hist.u, bin_edges)
             else:
                 result = Histogram(uarray(hist, err), bin_edges)
-        if(self.scale and self.scale != 1):
-            result *= self.scale
+        if self.scale == 'bins':
+            try:
+                result.hist /= (result.bin_edges[1:] - result.bin_edges[:-1])
+            except Exception as e:
+                log.error(f'Caught exception scaling by binwdith: {e}')
+                # should we do something here?
+        elif (self.scale and self.scale != 1):
+            result.hist *= self.scale
 
         return result
 
