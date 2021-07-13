@@ -84,13 +84,14 @@ class MongoSimsDB(SimulationsDB):
                 hits = tuple(self.collection.find(match.query,
                                                   self.livetimepro))
                 dataset = list(str(d['_id']) for d in hits)
-                try:
-                    livetime = self.livetime(match, hits)
-                except ZeroDivisionError:
-                    livetime = 0*units.year
-
+                livetime = 0*units.year
                 if not dataset:
                     match.addstatus('nodata')
+                else:
+                    try:
+                        livetime = self.livetime(match, hits)
+                    except ZeroDivisionError:
+                        pass
 
                 match.dataset = dataset
                 match.livetime = livetime
