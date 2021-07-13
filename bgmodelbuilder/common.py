@@ -23,8 +23,11 @@ units.load_definitions([
     "ppt_U = 0.001 * ppb_U = pptU",
     "ppt_Th = 0.001 * ppb_Th = pptTh",
     "ppt_K = 0.001 * ppb_K = pptK",
-    "dru = 1./(kg * keV * day) = DRU",
-    "kky = kg * keV * year = kg_keV_yr",
+    "dru = 1./(kg * keV * day) = dru = DRU",
+    "kky = kg * keV * year = kky = kg_keV_yr",
+    "ppm = 1e-6 = ppm = parts_per_million",
+    "ppb = 1e-9 = ppb = parts_per_billion",
+    "ppt = 1e-12 = ppt = parts_per_trillion",
 ])
 
 
