@@ -1,22 +1,18 @@
-#pythom 2+3 compatibility
+# pythom 2+3 compatibility
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import super
 
-import pymongo
 import bson
-from time import time
-from copy import copy
-from collections import namedtuple
-import json
 import logging
 import datetime
-from functools import lru_cache
 
+from ..common import try_reduce
 from .. import units
-from .simulationsdb import SimulationsDB, SimDataMatch
+from .simulationsdb import SimulationsDB
 
 log = logging.getLogger(__name__)
+
 
 class MongoSimsDB(SimulationsDB):
     """
@@ -30,6 +26,7 @@ class MongoSimsDB(SimulationsDB):
     objects which know how to parse and combine values.
 
     """
+
     def __init__(self, collection, buildqueries, livetime, livetimepro=None,
                  summaryview=None,
                  **kwargs):
@@ -57,24 +54,23 @@ class MongoSimsDB(SimulationsDB):
 
 
         """
-        #initialize the DB connection
+        # initialize the DB connection
         self.collection = collection
         self.buildqueries = buildqueries
         self.livetime = livetime
         self.livetimepro = livetimepro
 
-        #initialize the base class
+        # initialize the base class
         super().__init__(**kwargs)
 
-
-
     ########### required simulationsdb overrides ##############
+
     def genqueries(self, match, findnewdata=True):
         # call the callback to generate queries
         matches = self.buildqueries(match)
         # attach and interpret data
         if findnewdata:
-            #make sure its iterable
+            # make sure its iterable
             if not matches:
                 matches = []
             elif not isinstance(matches, (list, tuple, set)):
@@ -97,32 +93,53 @@ class MongoSimsDB(SimulationsDB):
                 match.livetime = livetime
         return matches
 
-    #@lru_cache(128)
-    def _eval_single(self, value, dataset):
-        """ Evaluate a single database hit. Separated to give some caching """
+
+
+    def _eval_match(self, values, match):
+        """ Evaluate a set of database hits over all values """
+        result = [None for _ in values]
         projection = {}
-        value.project(projection)
-        result = None
+        for value in values:
+            projection = value.project(projection)
+
+        dataset = match.dataset
+        if not dataset:
+            return result
+        if not isinstance(dataset, (list, tuple)):
+            dataset = (dataset,)
+        elif isinstance(dataset, list):
+            dataset = tuple(dataset)
+
         for entry in dataset:
-            #ID should be an object ID, but don't raise a fuss if not
+            # ID should be an object ID, but don't raise a fuss if not
             try:
                 entry = bson.ObjectId(entry)
             except bson.errors.InvalidId:
                 pass
 
-            doc = self.collection.find_one({'_id':entry}, projection)
+            doc = self.collection.find_one({'_id': entry}, projection)
             if not doc:
-                #Entry should have been for an existing document, so
-                #something went really wrong here...
-                raise KeyError("No document with ID %s in database"%entry)
+                # Entry should have been for an existing document, so
+                # something went really wrong here...
+                raise KeyError("No document with ID %s in database" % entry)
+            for i, v in enumerate(values):
+                try:
+                    result[i] = try_reduce(v.reduce, v.parse(doc), result[i])
+                except Exception as e:
+                    log.warning("Exception parsing %s in dataset %s: %s",
+                                v.label, doc.get('_id','<no id>'), e)
+
+        # now normalize everything
+        for i, v in enumerate(values):
+            if result[i] is None:
+                continue
             try:
-                parsed = value.parse(doc)
-                result = parsed if result is None else v.reduce(parsed, result)
+                result[i] = v.norm(result[i], match)
             except Exception as e:
-                log.warning("Caught exception parsing dataset %s: %s", entry, e)
-
+                log.warning("Caught exception normalizing match %s: %e",
+                            match.id, e)
+                result[i] = 0
         return result
-
 
     def evaluate(self, values, matches):
         """Sum up each key in values, weighted by livetime.
@@ -138,49 +155,30 @@ class MongoSimsDB(SimulationsDB):
 
         """
         result = [0]*len(values)
-        matches = matches if isinstance(matches,(list, tuple)) else [matches]
+        matches = matches if isinstance(matches, (list, tuple)) else [matches]
         for match in matches:
-            dataset = match.dataset
-            if not dataset:
-                continue
-            if not isinstance(dataset, (list, tuple)):
-                dataset = (dataset,)
-            elif isinstance(dataset, list):
-                dataset = tuple(dataset)
-
+            parsed = self._eval_match(values, match)
             for i, v in enumerate(values):
-                val = self._eval_single(v, dataset)
-                if val is None:
-                    continue
-                try:
-                    val = v.norm(val, match)
-                except Exception as e:
-                    log.warning("Caught exception normalizing match %s: %e", match.id, e)
-                    val = 0
-                try:
-                    result[i] = v.reduce(val, result[i])
-                except Exception as e:
-                    log.warning("Exception: %s, %s, %s", val, result[i], e)
-
+                result[i] = try_reduce(v.reduce, parsed[i], result[i])
         return result
 
-    def getdatasetdetails(self,dataset):
+    def getdatasetdetails(self, dataset):
         # dataset should be an ID but may be stringified
         try:
             dataset = bson.ObjectId(dataset)
-        except bson.errors.InvalidId: #not an object ID
+        except bson.errors.InvalidId:  # not an object ID
             pass
         return self.collection.find_one(dataset)
 
-        #if isinstance(dataset, str) and dataset.startswith('['):
+        # if isinstance(dataset, str) and dataset.startswith('['):
         #    try:
         #        dataset = json.loads(dataset)
         #    except json.JSONDecodeError:
         #        log.error("Can't convert from string list %s",dataset)
-        #if not isinstance(dataset,(list, tuple)):
+        # if not isinstance(dataset,(list, tuple)):
         #    dataset = [bson.ObjectId(dataset)]
-        #return list(self.collection.find({'_id':{'$in':dataset}}))
-        #return [self.collection.find_one({'_id':entry}) for entry in dataset]
+        # return list(self.collection.find({'_id':{'$in':dataset}}))
+        # return [self.collection.find_one({'_id':entry}) for entry in dataset]
 
     @staticmethod
     def modquery(query, request):
@@ -227,7 +225,7 @@ class MongoSimsDB(SimulationsDB):
         elif fmt.lower() == 'dict':
             pass
         else:
-            raise NotImplementedError("Unhandled format %s",fmt)
+            raise NotImplementedError("Unhandled format %s", fmt)
 
         entry['_inserted'] = str(datetime.datetime.utcnow())
         result = self.collection.insert_one(entry)

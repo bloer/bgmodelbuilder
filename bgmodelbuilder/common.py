@@ -217,3 +217,15 @@ def stripdefaults(target, removeempty=list(), removeexact=dict()):
             del target[key]
 
     return target
+
+def try_reduce(reducer, val1, val2, fallbackval1=True):
+    if val2 is None:
+        return val1
+    elif val1 is None:
+        return val2
+
+    try:
+        return reducer(val1, val2)
+    except Exception as e:
+        log.warn(f"Caught exception reducing {val1} and {val2}: {e}")
+        return val1 if fallbackval1 else val2
