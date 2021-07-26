@@ -3,6 +3,9 @@ import numpy as np
 from ..common import units
 
 class Histogram(object):
+    # check only bins size when combining or total equality
+    __strictchecking = False
+
     """2-tuple mimicking np.histogram structure, with operator overloads
     so that bins are not added/scaled etc
     """
@@ -95,6 +98,11 @@ class Histogram(object):
         a, b = self._bound(a,b)
         return self.integrate(a, b, binwidths) / (b-a)
 
+    def __repr__(self):
+        return f"Histogram<{len(self.hist)} bins>"
+
+    def __str__(self):
+        return repr(self)
 
     def _testbins(self, other):
         try:
@@ -105,10 +113,14 @@ class Histogram(object):
             return self.bin_edges
         elif self.bin_edges is None:
             return otherbins
-        elif not np.array_equal(self.bin_edges,otherbins):
-            msg = ("Can't combins histograms with different binning: %s and %s"
-                   %(self.bin_edges, otherbins))
-            raise ValueError(msg)
+        else:
+            binsmatch = (self.bin_edges.shape == otherbins.shape)
+            if self.__strictchecking:
+                binsmatch = np.array_equal(self.bin_edges,otherbins)
+            if not binsmatch:
+                msg = ("Can't combins histograms with different binning: %s and %s"
+                       %(self.bin_edges, otherbins))
+                raise ValueError(msg)
         return self.bin_edges
 
     def _combine(self, other, op, inplace=False):
