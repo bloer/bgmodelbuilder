@@ -94,6 +94,11 @@ class BgModel(Mappable):
             res = (m for m in res if rootcomponent in m.assemblyPath.components)
         return list(res)
 
+    def getcomponents(self):
+        """ get components. Simple wrapper to provide same signature
+        as other methods """
+        return self.components.values()
+
     def getspecs(self, rootonly=True):
         """Get all EmissionSpecs stored in the model.
         Args:
