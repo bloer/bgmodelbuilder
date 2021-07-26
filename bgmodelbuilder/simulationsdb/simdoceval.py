@@ -74,6 +74,26 @@ class SimDocEval(abc.ABC):
                          ",".join("%s=%s"%(key,val)
                                   for key,val in self.__dict__.items()))
 
+    def testcache(self, doc, uselabel=True):
+        """ See if there is already an entry in `doc` with our name and
+        if so, return it
+        Args:
+            doc (dict): document to parse
+        Returns:
+            doc[self.key] if found else None
+        """
+        key = self.label if uselabel else self.key
+        try:
+            return doc[key]
+        except Exception:
+            return None
+
+    def setcache(self, doc, parsed, uselabel=True):
+        """ Store the result of `parse` in the document """
+        key = self.label if uselabel else self.key
+        doc[key] = parsed
+
+
     ######## Private methods ###################
 
     @property
@@ -149,7 +169,7 @@ class UnitsHelper(object):
     def projectunit(self, projection):
         if self.unitkey and projection:
             projection[self.unitkey] = True
-        return projection #shouldn't be necessary
+        return projection
 
     def applyunit(self, result, document):
         unit = self.unit
@@ -255,7 +275,11 @@ class DirectSpectrum(SimDocEval):
         return super().project(projection)
 
     def parse(self, document):
-        #should we check that the key returns a list?
+        # first check if value is already cached
+        cached = self.testcache(document)
+        if cached is not None:
+            return cached
+        # should we check that the key returns a list?
         hist = None
         try:
             hist = splitsubkeys(document, self.speckey)
@@ -271,6 +295,8 @@ class DirectSpectrum(SimDocEval):
                 pass
 
         if hist is None:
+            if bin_edges is not None:
+                raise ValueError("No values or bins in document")
             hist = np.zeros_like(bin_edges[:-1])
 
         try:
@@ -310,6 +336,7 @@ class DirectSpectrum(SimDocEval):
         elif (self.scale and self.scale != 1):
             result.hist *= self.scale
 
+        self.setcache(document, result)
         return result
 
     def _key(self):
