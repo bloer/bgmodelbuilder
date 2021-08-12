@@ -7,7 +7,9 @@ import pint
 from pint.numpy_func import implements, unwrap_and_wrap_consistent_units
 import uncertainties
 import numpy as np
+import logging
 
+log = logging.getLogger(__name__)
 # physical units #######
 units = pint.UnitRegistry()
 units.auto_reduce_dimensions = False  # this doesn't work right
