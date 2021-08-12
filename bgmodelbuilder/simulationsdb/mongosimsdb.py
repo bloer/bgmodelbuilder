@@ -154,7 +154,13 @@ class MongoSimsDB(SimulationsDB):
                         each value over
 
         """
-        result = [0]*len(values)
+        try:
+            lenresult = len(values)
+        except TypeError:
+            values = [values]
+            lenresult = 1
+
+        result = [0]*lenresult
         matches = matches if isinstance(matches, (list, tuple)) else [matches]
         for match in matches:
             parsed = self._eval_match(values, match)
