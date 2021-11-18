@@ -314,14 +314,16 @@ class Placement(object):
     datasets. This lets us avoid copying components.
     """
     # TODO: give placements names!
-    def __init__(self, parent=None, component=None, weight=1, querymod=None,
-                 name=None):
+    def __init__(self, parent=None, component=None, weight=1, simvolume=None,
+                 querymod=None, name=None):
         """Args:
             parent (Assembly): assembly in which we're being placed
                 Unlike components, placements should be unique
             component (Component): the component or assembly to place here
             weight (numeric): Usually, how many of this component, but could
                 be fractional in some cases
+            simvolume (str): identifer to match simulation volumes (e.g., the
+                             name of the G4PhysicalVolume)
             querymod (dict): modifier to DB query to locate sim datasets
             name (str): Name associated with this particular placement. By
                         default will adopt the name of the component
@@ -330,6 +332,7 @@ class Placement(object):
         self.parent = parent
         self.component = component
         self.weight = weight
+        self.simvolume = simvolume
         self.querymod = querymod
         self._name = None
         self.name = name
@@ -358,7 +361,7 @@ class Placement(object):
         result = removeclasses(copy(self.__dict__))
         #replace objects with ID references
         del result['parent'] #this gets reset on construction
-        stripdefaults(result, ['querymod', 'name'],
+        stripdefaults(result, ['querymod', 'name', 'simvolume'],
                       dict(weight=1, name=getattr(self.component, 'name')))
         return result
 

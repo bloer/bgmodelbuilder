@@ -104,6 +104,9 @@ class SimDataMatch(Mappable):
     def __init__(self, assemblyPath=None, spec=None, query=None, weight=1,
                  dataset=None, livetime=0, status=None, rawerate=None,
                  **kwargs):
+        # for backward compatibility, some stored dicts have cached vals:
+        kwargs.pop('rawerate', None)
+        kwargs.pop('simvolume', None)
         super().__init__(**kwargs)
         self.assemblyPath = assemblyPath or AssemblyPath()
         self.spec = spec
@@ -112,7 +115,8 @@ class SimDataMatch(Mappable):
         self.dataset = dataset
         self.livetime = ensure_quantity(livetime or 0, "year")
         self.status = status or ""
-        self._rawerate = ensure_quantity(rawerate, "1/day")
+        self._rawerate = None
+        self._simvolume = None
 
     @property
     def emissionrate(self):
@@ -193,6 +197,22 @@ class SimDataMatch(Mappable):
     def component(self):
         return self.assemblyPath[-1].component if self.assemblyPath else None
 
+    @property
+    def simvolume(self):
+        """ Simvolume is a parameter of Placements. If none is defined, fall
+        back to `component.name`
+        """
+        # if self._simvolume is defined, we've already cached this
+        if not self._simvolume:
+            # first traverse backward through the AssemblyPath and look for any
+            # placement with simvolume defined
+            self._simvolume = self.component.name
+            for placement in reversed(self.assemblyPath):
+                if placement.simvolume:
+                    self._simvolume = placement.simvolume
+                    break
+        return self._simvolume
+
     def clone(self, query=None, weight=None, dataset=None, livetime=None):
         """Overload `Mappable.clone` to provide the things that should change"""
         newmatch = super().clone()
@@ -209,9 +229,9 @@ class SimDataMatch(Mappable):
     def todict(self):
         mydict = copy.copy(self.__dict__)
         result = to_primitive(mydict)
-        stripdefaults(result, ['dataset', 'rawerate', 'livetime'],
-                      dict(weight=1, livetime="0 s", status="nodata"))
-        # todo: rawerate is a cached value. Should we just recalculate?
+        stripdefaults(result, ['dataset', 'livetime'],
+                      dict(weight=1, livetime="0 s", status="nodata"),
+                      ['_rawerate','_simvolume'])
         return result
 
 def netlivetime(matches):

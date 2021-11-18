@@ -194,7 +194,8 @@ def removeclasses(adict, renameunderscores=True, recursive=True,
     return adict
 
 
-def stripdefaults(target, removeempty=list(), removeexact=dict()):
+def stripdefaults(target, removeempty=list(), removeexact=dict(),
+                  removeall=list()):
     """ Make output dicts smaller by removing default entries. Keys are
     removed from `target` in place
     Args:
@@ -203,6 +204,7 @@ def stripdefaults(target, removeempty=list(), removeexact=dict()):
                             tests as false (None, "", [], {}, etc)
         removeexact (dict): Remove keys in this dict from target if the
                             correspondong values are equal
+        removeall (list):   Remove all keys in this list ignoring values
     Returns:
         target with the keys removed
     """
@@ -217,6 +219,12 @@ def stripdefaults(target, removeempty=list(), removeexact=dict()):
     for key, val in removeexact.items():
         if target.get(key) == val:
             del target[key]
+
+    for key in removeall:
+        try:
+            del target[key]
+        except KeyError:
+            pass
 
     return target
 
