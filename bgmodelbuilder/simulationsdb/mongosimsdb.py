@@ -117,7 +117,12 @@ class MongoSimsDB(SimulationsDB):
             except bson.errors.InvalidId:
                 pass
 
-            doc = self.collection.find_one({'_id': entry}, projection)
+            try:
+                doc = self.collection.find_one({'_id': entry}, projection)
+            except Exception as e:
+                log.error("Caught exception '%s' querying database with projection %s",e, projection)
+                doc = None
+
             if not doc:
                 # Entry should have been for an existing document, so
                 # something went really wrong here...
