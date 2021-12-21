@@ -295,7 +295,7 @@ class DirectSpectrum(SimDocEval):
                 pass
 
         if hist is None:
-            if bin_edges is not None:
+            if bin_edges is None:
                 raise ValueError("No values or bins in document")
             hist = np.zeros_like(bin_edges[:-1])
 
