@@ -388,7 +388,7 @@ class RadonExposure(RadioactiveContam):
     _default_column_height = 10*units.cm
 
     def __init__(self,radonlevel=100*units('Bq/m**3'), exposure=1*units.day,
-                 distribution='surface',
+                 # distribution='surface',           ## Commented out as this was causing issues setting distribution in front-end ##
                  column_height = _default_column_height, mode="free",
                  **kwargs):
         self.radonlevel = ensure_quantity(radonlevel,"Bq/m^3")
