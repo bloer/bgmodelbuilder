@@ -3,9 +3,12 @@ import operator
 import numpy as np
 from uncertainties import ufloat
 from uncertainties.unumpy import uarray
+from typing import Union
 import logging
 log = logging.getLogger(__name__)
 from .. import units
+from ..common import decompressdict
+from ..asymmetric import AsymmetricError
 from .histogram import Histogram
 
 class SimDocEval(abc.ABC):
@@ -187,46 +190,57 @@ class UnitsHelper(object):
                 pass
         return result
 
-class DirectValue(SimDocEval, UnitsHelper):
-    """Get a unit directly from a key. Converter is a function
-    to convert the (usually string) result into a number.
-    errcalc is a function to calculate the error from the value
-    _before_ units are applied. Defaults to sqrt(val) which only works if
-    val is unitless
+def valtoquantity(value):
+    """ Convert a document to a Quantity<AsymmetricError>. If an error
+    occurs, an exception will be raised """
+    unit = units(value.pop('unit', None))
+    return AsymmetricError(**value) * unit
+
+class DirectValue(SimDocEval):
+    """Get a value directly from a dictionary. key can use dot notation to
+    access sudocuments. Returns as a Quantity<AsymmetricError>. If not found,
+    will be "(0 +/- 0) dimensionless"
     """
-    def __init__(self, val, converter=lambda x:x, errcalc=(np.sqrt),
-                 *args, **kwargs):
+    def __init__(self, val, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.val = val
-        self.converter = converter
-        self.errcalc = errcalc
 
     def project(self, projection):
         projection[self.val] = True
-        self.projectunit(projection)
         return super().project(projection)
 
     def parse(self, document):
-        #should we just throw an exception if the key is bad?
-        result = 0
+        #should we throw an exception or return None if the key is bad instead?
         try:
-            result = self.converter(splitsubkeys(document, self.val))
+            val = splitsubkeys(document, self.val)
         except KeyError:
-            pass
-        err = self.errcalc(result)
-        return self.applyunit(ufloat(result, err), document)
+            return AsymmetricError(0, 0) * units('dimensionless')
+        return valtoquantity(val)
 
     def _key(self):
-        return("DirectValue(%s,%s,%s)"%(self.val,
-                                     self.unit,
-                                     self.unitkey))
+        return("DirectValue(%s)"%self.val)
+
+
+def valtospectrum(value):
+    """ Convert a document `val` to a Histogram where hist is a
+    Quantity<AsymmetricError<array>>>
+    """
+    if isinstance(value, Histogram):
+        return value
+    if isinstance(value, bytes):
+        value = decompressdict(value)
+    if isinstance(value, dict):
+        bins = value.pop('bins')
+        if bins is not None:
+            bins = bins * units(value.pop('binsunit', None))
+        unit = units(value.pop('unit', None))
+        hist = AsymmetricError(*value['hist']) * unit
+        return Histogram(hist, bins)
+    raise ValueError(f"{value} is not a valid histogram value")
+
 
 class DirectSpectrum(SimDocEval):
-    def __init__(self, speckey, specunit=None, specunitkey=None,
-                 bin_edges=None,
-                 binskey=None, binsunit=None, binsunitkey=None,
-                 errcalc=None, scale=1,
-                 *args, **kwargs):
+    def __init__(self, val, *args, **kwargs):
         """Extract a list from `speckey` in the document and convert it to a
         numpy array.  If `binskey` is provided, bin edges are read from
         that key. bin_edges can be used to directly provide bins instead or as
@@ -258,20 +272,10 @@ class DirectSpectrum(SimDocEval):
         """
         #TODO: add option to integrate/average over range
         super().__init__(*args, **kwargs)
-        self.speckey = speckey
-        self.specunit = UnitsHelper(specunit, specunitkey)
-        self.bin_edges = bin_edges
-        self.binskey = binskey
-        self.binsunit = UnitsHelper(binsunit, binsunitkey)
-        self.errcalc = errcalc
-        self.scale = scale
+        self.val = val
 
     def project(self, projection):
-        projection[self.speckey] = True
-        self.specunit.projectunit(projection)
-        if self.binskey:
-            projection[self.binskey] = True
-            self.binsunit.projectunit(projection)
+        projection[self.val] = True
         return super().project(projection)
 
     def parse(self, document):
@@ -279,69 +283,21 @@ class DirectSpectrum(SimDocEval):
         cached = self.testcache(document)
         if cached is not None:
             return cached
-        # should we check that the key returns a list?
-        hist = None
+
         try:
-            hist = splitsubkeys(document, self.speckey)
+            val = splitsubkeys(document, self.val)
         except KeyError:
-            pass
-        if isinstance(hist,(list, tuple)):
-            hist = np.array(hist)
-        bin_edges = self.bin_edges
-        if self.binskey:
-            try:
-                bin_edges = np.array(splitsubkeys(document, self.binskey))
-            except KeyError:
-                pass
+            log.warning("Document %s has no entry for key %s, returning 0",
+                        document.get('_id',"ID NOT FOUND"), self.val)
+            return AsymmetricError(0,0) * units('dimensionless')
 
-        if hist is None:
-            if bin_edges is None:
-                raise ValueError("No values or bins in document")
-            hist = np.zeros_like(bin_edges[:-1])
-
-        try:
-            bin_edges = self.binsunit.applyunit(bin_edges, document)
-            hist = self.specunit.applyunit(hist, document)
-        except AttributeError: #thrown if hist is not unit-able
-            pass
-
-        result = Histogram(hist, bin_edges)
-
-        try:
-            err = None
-            if self.errcalc:
-                err = self.errcalc(result)
-            elif not hasattr(hist, 'units'):
-                err = np.sqrt(hist)
-            elif hist.dimensionless:
-                err = np.sqrt(hist)
-            elif (bin_edges is not None and hasattr(bin_edges,'units')
-                  and hist.u == 1/bin_edges.u):
-                err = np.sqrt(hist / (bin_edges[1:]-bin_edges[:-1]))
-        except (AttributeError, TypeError): #numpy.sqrt is failing
-            pass
-
-
-        if err is not None:
-            if hasattr(hist, 'units'):
-                result = Histogram(uarray(hist.m,err.m)*hist.u, bin_edges)
-            else:
-                result = Histogram(uarray(hist, err), bin_edges)
-        if self.scale == 'bins':
-            try:
-                result.hist /= (result.bin_edges[1:] - result.bin_edges[:-1])
-            except Exception as e:
-                log.error(f'Caught exception scaling by binwdith: {e}')
-                # should we do something here?
-        elif (self.scale and self.scale != 1):
-            result.hist *= self.scale
-
+        result = valtospectrum(val)
         self.setcache(document, result)
         return result
 
     def _key(self):
         #do we need all the unit keys too?
-        return "DirectSpectrum({},{})".format(self.speckey, self.binskey)
+        return f"DirectSpectrum({self.val})"
 
 
 class SpectrumAverage(DirectSpectrum):

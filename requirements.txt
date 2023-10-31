@@ -1,3 +1,5 @@
 pint>=0.7
 pymongo>=3.3.0
 uncertainties==3.0.2
+scipy
+numpy

@@ -14,5 +14,7 @@ setup(name='bgmodelbuilder',
           'uncertainties',
           'numpy',
           'shortuuid',
+          'scipy',
+          'mongoengine',
       ],
 )

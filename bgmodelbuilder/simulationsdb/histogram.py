@@ -1,6 +1,6 @@
 import operator
 import numpy as np
-from ..common import units
+from ..common import units, compressdict
 
 class Histogram(object):
     # check only bins size when combining or total equality
@@ -10,13 +10,6 @@ class Histogram(object):
     so that bins are not added/scaled etc
     """
     def __init__(self, hist, bin_edges=None):
-        # todo: make sure we don't steal an array?
-        if isinstance(hist, units.Quantity):
-            if not isinstance(hist.m, np.ndarray):
-                hist = units.Quantity(np.array(hist.m), hist.u)
-        elif not isinstance(hist, np.ndarray):
-            hist = np.array(hist)
-
         self.hist = hist
         self.bin_edges = bin_edges
         if bin_edges is None:
@@ -78,18 +71,22 @@ class Histogram(object):
         bins = self.bin_edges
         spec = self.hist
         a, b = self._bound(a,b)
-        if binwidth:
-            spec = spec * (bins[1:]-bins[:-1])
-
-        first = bins.searchsorted(a,"right")
-        last = bins.searchsorted(b,"left")
+        weights = np.zeros_like(spec)
+        first = bins.searchsorted(a,"right")-1
+        last = bins.searchsorted(b,"left")-1
+        weights[first:last] = 1
         #take fractions of the first and last bins
         if first == last:
-            return spec[first-1] * (b-a)/(bins[first]-bins[first-1])
-        return ( spec[first-1] * (bins[first]-a)/(bins[first]-bins[first-1])
-                 +spec[last-1] * (b-bins[last-1])/(bins[last]-bins[last-1])
-                 +sum(spec[first:max(last-1,first)])
-             )
+            weights[first] = (b-a) / (bins[first+1] - bins[first])
+        else:
+            weights[first] = (bins[first+1]-a)/(bins[first+1]-bins[first])
+            weights[last] = (b-bins[last]) / (bins[last+1]-bins[last])
+
+        if binwidth:
+            weights = weights * (bins[1:]-bins[:-1])
+
+        return self.hist.dot(weights)
+
 
     def average(self, a=None, b=None, binwidths=True):
         """Calculate the average from a to b. See `integrate` for description
@@ -125,7 +122,8 @@ class Histogram(object):
 
     def _combine(self, other, op, inplace=False):
         #treat None as zero
-
+        if other is None:
+            other = 0
         #make sure bins are equal
         bins = self._testbins(other)
 
@@ -144,80 +142,63 @@ class Histogram(object):
     #todo: should we provide for adding raw spectra rather than just Histograms?
     #binary copy operators
     def __add__(self, other):
-        if other is None:
-            other = 0
+        return self._combine(other, operator.add)
         try:
             return self._combine(other, np.add)
         except units.errors.DimensionalityError:
             return self._combine(other, operator.add)
 
     def __sub__(self, other):
-        if other is None:
-            other = 0
-        return self._combine(other, np.subtract)
+        return self._combine(other, operator.subtract)
 
     def __mul__(self, other):
-        if other is None:
-            other = 0
-        return self._combine(other, np.multiply)
+        return self._combine(other, operator.mul)
 
     def __floordiv__(self, other):
-        return self._combine(other, np.floor_divide)
+        return self._combine(other, operator.floor_divide)
 
     def __truediv__(self, other):
-        return self._combine(other, np.true_divide)
+        return self._combine(other, operator.true_divide)
 
     def __mod__(self, other):
-        return self._combine(other, np.mod)
+        return self._combine(other, operator.mod)
 
     def __pow__(self, other):
-        return self._combine(other, np.power)
+        return self._combine(other, operator.power)
 
     #do we need logical/bitwise operators??
 
     #binary in-place operators
     def __iadd__(self, other):
-        if other is None:
-            other = 0
-        return self._combine(other, np.add, inplace=True)
+        return self._combine(other, operator.add, inplace=True)
 
     def __isub__(self, other):
-        if other is None:
-            other = 0
-        return self._combine(other, np.subtract, inplace=True)
+        return self._combine(other, operator.subtract, inplace=True)
 
     def __imul__(self, other):
-        if other is None:
-            other = 0
-        return self._combine(other, np.multiply, inplace=True)
+        return self._combine(other, operator.multiply, inplace=True)
 
     def __ifloordiv__(self, other):
-        return self._combine(other, np.floor_divide, inplace=True)
+        return self._combine(other, operator.floor_divide, inplace=True)
 
     def __itruediv__(self, other):
-        return self._combine(other, np.true_divide, inplace=True)
+        return self._combine(other, operator.true_divide, inplace=True)
 
     def __imod__(self, other):
-        return self._combine(other, np.mod, inplace=True)
+        return self._combine(other, operator.mod, inplace=True)
 
     def __ipow__(self, other):
-        return self._combine(other, np.power, inplace=True)
+        return self._combine(other, operator.power, inplace=True)
 
     #reverse binary operators
     #these should only ever be called if type(other) != type(self)
     def __radd__(self, other):
-        if other is None:
-            other = 0
         return self.__class__(other + self.hist, self.bin_edges)
 
     def __rsub__(self, other):
-        if other is None:
-            other = 0
         return self.__class__(other - self.hist, self.bin_edges)
 
     def __rmul__(self, other):
-        if other is None:
-            other = 0
         return self.__class__(other * self.hist, self.bin_edges)
 
     def __rfloordiv__(self, other):
@@ -239,7 +220,7 @@ class Histogram(object):
         return self.__class__(-self.hist, self.bin_edges)
 
     def __abs__(self):
-        return self.__class__(np.abs(self.hist), self.bin_edges)
+        return self.__class__(operator.abs(self.hist), self.bin_edges)
 
 
 

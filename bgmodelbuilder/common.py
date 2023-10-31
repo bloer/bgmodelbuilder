@@ -2,9 +2,13 @@
 Common functions and utility classes shared by other units
 """
 import inspect
+import io
+import json
+import bson
 from copy import copy
 import pint
 from pint.numpy_func import implements, unwrap_and_wrap_consistent_units
+from typing import Union
 import uncertainties
 import numpy as np
 import logging
@@ -12,6 +16,7 @@ import logging
 log = logging.getLogger(__name__)
 # physical units #######
 units = pint.UnitRegistry()
+pint.set_application_registry(units)
 units.auto_reduce_dimensions = False  # this doesn't work right
 units.errors = pint.errors
 units.default_format = '~gP'
@@ -121,15 +126,17 @@ class _Stringify(object):
 
     @staticmethod
     def appliesto(val):
-        return isinstance(val, pint.Quantity)
+        return isinstance(val, (pint.Quantity, bson.ObjectId))
 
     @staticmethod
     def stringify(val):
-        return _Stringify.stringify_quantity(val)
+        if isinstance(val, pint.Quantity):
+            return _Stringify.stringify_quantity(val)
+        return str(val)
 
     @staticmethod
     def stringify_quantity(val):
-        return "{} {:~P}".format(repr(val.m), val.u)
+        return "{} {:~P}".format(val.m, val.u)
 
 
 def to_primitive(val, renameunderscores=True, recursive=True,
@@ -142,10 +149,10 @@ def to_primitive(val, renameunderscores=True, recursive=True,
         val =  val._id
 
     elif inspect.getmodule(val): #I think this tests for non-builtin classes
-        if hasattr(val, 'todict'): #has a custom conversion
-            val =  val.todict()
-        elif _Stringify.appliesto(val):
+        if _Stringify.appliesto(val):
             val =  _Stringify.stringify(val)
+        elif hasattr(val, 'todict'): #has a custom conversion
+            val =  val.todict()
         elif hasattr(val, '__dict__'): #this is probably going to break lots
             val =  copy(val.__dict__)
         else: #not sure what this is...
@@ -239,3 +246,42 @@ def try_reduce(reducer, val1, val2, fallbackval1=True):
     except Exception as e:
         log.warn(f"Caught exception reducing {val1} and {val2}: {e}")
         return val1 if fallbackval1 else val2
+
+class NumpyEncoder(json.JSONEncoder):
+    """ needed to json encode numpy arrays. stolen from
+    https://stackoverflow.com/a/47626762/3657349
+    """
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def compressdict(doc: dict, force: bool = False) -> Union[dict, bytes]:
+    """ If the document is smaller as a compressed npz blob than string,
+    return the compressed version
+    If Force is True, always return binary, otherwise test if
+    json representation is smaller
+    """
+    buf = io.BytesIO()
+    np.savez_compressed(buf, **doc)
+    if not force:
+        if buf.tell() > len(json.dumps(doc, cls=NumpyEncoder)):
+            # nake sure all numpy arrays are plain lists
+            for k, v in list(doc.items()):
+                if isinstance(v, np.ndarray):
+                    doc[k] = v.tolist()
+            return doc
+    return buf.getvalue()
+
+def decompressdict(blob: bytes) -> dict:
+    """ return a dict from the output of `compress` """
+    buf = io.BytesIO(blob)
+    value = dict(**np.load(buf))
+    # remore np.array wrapper from non-array items
+    for k, v in list(value.items()):
+        try:
+            value[k] = v.item()
+        except (ValueError, AttributeError):
+            pass
+    return value

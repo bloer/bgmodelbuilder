@@ -13,6 +13,7 @@ from builtins import super
 from math import log,exp
 from .common import units, ensure_quantity, removeclasses, stripdefaults
 from .mappable import Mappable
+from .asymmetric import AsymmetricError
 from copy import copy
 from math import sqrt
 import numbers
@@ -102,29 +103,34 @@ class EmissionSpec(Mappable):
 
     @property
     def ratewitherr(self):
-        """Get the rate with error"""
+        """ Convert to an AsymmetricError object for future manipulations """
         rate = self.rate
         if rate is None:
             return None
-        if self.err:
-            rate = rate.plus_minus(self.err, relative=True)
-        return rate
+
+        try:
+            unit = rate.u
+            rate = rate.m
+        except AttributeError:
+            unit = units('dimensionless')
+
+        if self.islimit:
+            rate = AsymmetricError.fromlimit(rate)
+        elif self.err:
+            rate = AsymmetricError(rate, rate * self.err)
+        else:
+            rate = AsymmetricError(rate)
+        return rate * unit
+
 
     def getratestr(self, sigfigs=None):
         rate = self.ratewitherr
         if rate is None:
             return "undefined"
         try:
-            res=""
-            if self.islimit:
-                res += "<"
-            format = (".%dg"%sigfigs) if sigfigs else "g"
-            if isinstance(rate, (units.Quantity, units.Measurement)):
-                format = ":~"+format+"P"
-            else:
-                format = ":"+format
-            res += ("{"+format+"}").format(rate)
-            return res
+            fmtstr = (".%dg"%sigfigs) if sigfigs else "g"
+            fmtstr = ''.join(['{:~', fmtstr, 'P}'])
+            return fmtstr.format(rate)
         except Exception as e:
             return "error: "+str(e)
 

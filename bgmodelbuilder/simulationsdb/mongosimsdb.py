@@ -173,7 +173,7 @@ class MongoSimsDB(SimulationsDB):
                 result[i] = try_reduce(v.reduce, parsed[i], result[i])
         return result
 
-    def getdatasetdetails(self, dataset):
+    def getdatasetdetails(self, dataset, raw: bool = False):
         # dataset should be an ID but may be stringified
         try:
             dataset = bson.ObjectId(dataset)

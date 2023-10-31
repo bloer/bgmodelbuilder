@@ -223,7 +223,7 @@ class SimulationsDB(object):
         raise NotImplementedError
 
 
-    def getdatasetdetails(self, datasetid):
+    def getdatasetdetails(self, datasetid, raw: bool = False):
         """Return an object with detailed info about a dataset
         To be implemented by the concrete database instance.
         """
