@@ -59,7 +59,7 @@ def decompress(blob: bytes) -> dict:
     return value
 
 def utostr(unit):
-    return '{:~P}'.format(unit)
+    return '{:~C}'.format(unit)
 
 class UnitField(BaseField):
     """ Store a unit as a string """

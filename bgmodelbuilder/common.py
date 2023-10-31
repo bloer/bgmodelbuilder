@@ -19,7 +19,7 @@ units = pint.UnitRegistry()
 pint.set_application_registry(units)
 units.auto_reduce_dimensions = False  # this doesn't work right
 units.errors = pint.errors
-units.default_format = '~gP'
+units.default_format = '~gC'
 # fix Bq, add ppb units
 units.load_definitions([
     "Bq = Hz = Bq = Becquerel",
