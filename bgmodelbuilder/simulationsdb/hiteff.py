@@ -30,7 +30,7 @@ class NormMultiplier(Enum):
             unitstr = '1/s/cm**2'
         elif self is NormMultiplier.flux_per_sr:
             unitstr = '1/s/cm**2/sr'
-        return unitreg(unitstr)
+        return unitreg(unitstr).u
 
 class HitEfficiency(DynamicDocument):
     """ Document describing how efficiently radiation from a given source at
@@ -139,6 +139,14 @@ class HitEfficiency(DynamicDocument):
                       self.key)
         return None
 
+    def get_output_unit(self, result):
+        """ Get the expected output unit for result (value or spectrum) """
+        try:
+            ru = result.u
+        except AttributeError:
+            ru = result.hist.u
+        return (1 * ru * self.norm.units).to_reduced_units().u
+
 
 class HitEffConfig(EmbeddedDocument):
     """ Configure settings for displaying and querying HitEfficiencies """
@@ -189,7 +197,7 @@ class HitEffDbConfig(Document):
                 result = entrylist.get(config.key, None)
                 if result is None:
                     continue
-                testval = result.u * hiteff.norm.units
+                testval = hiteff.get_output_unit(result)
                 if not testval.is_compatible_with(config.display_unit):
                     raise ValidationError(f"Entry {config.key} in {hiteff.key}"
                                           f" has wrong units {result.u}")
@@ -234,27 +242,68 @@ class HitEffDbConfig(Document):
         result = queryset.with_id(entryid)
         return result
 
-    def save_entry(self, entry):
+    def update_config_from(self, entry: HitEfficiency, doreload: bool = False,
+                           dosave: bool = True):
+        """ Guess unit configuration and spectrum links from ths entry """
+        if doreload:
+            try:
+                self.reload()
+            except Exception:
+                pass
+        for key, spec in entry.spectra.items():
+            cfg = self.display_spectra.setdefault(key, HitEffConfig(key=key))
+            if not cfg.display_unit:
+                cfg.display_unit = entry.get_output_unit(spec)
+
+        for key, val in entry.values.items():
+            cfg = self.display_values.setdefault(key, HitEffConfig(key=key))
+            if not cfg.display_unit:
+                cfg.display_unit = entry.get_output_unit(val)
+            if not cfg.link_spectrum and key in self.display_spectra:
+                cfg.link_spectrum = key
+        if dosave:
+            self.save()
+        return self
+
+    def save_entry(self, entry, dovalidate: bool = True,
+                   doupdateconfig: bool = True):
+        """ Save the entry HitEfficiency in the correct collection
+        Args:
+            entry: HitEfficiency object to save
+            dovalidate: if true, validate the entry against defined units
+                        entry-level validation is always run on save
+            doudpateconfig: Update our own config with any new values
+        """
+        if dovalidate:
+            self.validate_entry(entry)
         with switch_collection(HitEfficiency, self.collection_name):
             entry.save()
+        if doupdateconfig:
+            self.update_config_from(entry)
         return entry
 
-    def update_from_collection(self, reload: bool = False,
+    def update_from_collection(self, doreload: bool = False,
                                dosave: bool = True) -> 'HitEffDbConfig':
         """ Inspect the entries in a collection and populate a config entry.
         This is useful to update the config view based on what's actually
         in the collection
         """
-        if reload:
+        if doreload:
             try:
                 self.reload()
             except Exception:
                 pass
-        for hiteff in self.queryset:
-            for key in hiteff.values:
+        for hiteff in self.queryset.only('values_keys', 'spectra_keys'):
+            for key in hiteff.values_keys:
                 self.display_values.setdefault(key, HitEffConfig(key=key))
-            for key in hiteff.spectra:
+            for key in hiteff.spectra_keys:
                 self.display_spectra.setdefault(key, HitEffConfig(key=key))
+        # try to guess some things if not provided
+        # so we don't have to read a ton, assume all entries are the same
+        # probably a bad assumption, but here we are
+        doc = self.queryset.first()
+        if doc:
+            self.update_config_from(doc, doreload=False, dosave=False)
         if dosave:
             self.save()
         return self
