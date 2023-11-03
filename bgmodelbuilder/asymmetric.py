@@ -343,11 +343,8 @@ class AsymmetricError:
 
     @staticmethod
     def _scaleweights(weights, scalar):
-        try:
-            return {k: v*scalar for k, v in weights.items()}
-        except ValueError:
-            # numpy broadcasting is picky
-            return {k: (v*np.array(scalar).T).T for k, v in weights.items()}
+        return {k: np.array([v[0]*scalar, v[1]*scalar])
+                for k, v in weights.items()}
 
     def rezero(self, inplace=False):
         """ Zero the sigmas of all entries with zero mode.  See `addtreatzero`
