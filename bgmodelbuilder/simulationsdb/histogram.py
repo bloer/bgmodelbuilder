@@ -155,10 +155,10 @@ class Histogram(object):
         return self._combine(other, operator.mul)
 
     def __floordiv__(self, other):
-        return self._combine(other, operator.floor_divide)
+        return self._combine(other, operator.floordiv)
 
     def __truediv__(self, other):
-        return self._combine(other, operator.true_divide)
+        return self._combine(other, operator.truediv)
 
     def __mod__(self, other):
         return self._combine(other, operator.mod)
@@ -179,10 +179,10 @@ class Histogram(object):
         return self._combine(other, operator.multiply, inplace=True)
 
     def __ifloordiv__(self, other):
-        return self._combine(other, operator.floor_divide, inplace=True)
+        return self._combine(other, operator.floordiv, inplace=True)
 
     def __itruediv__(self, other):
-        return self._combine(other, operator.true_divide, inplace=True)
+        return self._combine(other, operator.truediv, inplace=True)
 
     def __imod__(self, other):
         return self._combine(other, operator.mod, inplace=True)
