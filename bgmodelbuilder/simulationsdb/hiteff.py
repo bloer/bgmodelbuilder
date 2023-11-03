@@ -99,6 +99,8 @@ class HitEfficiency(DynamicDocument):
     primary_spectrum = DynamicField(required=False)
     primary_yield = FloatField(required=False, default=1)
     biasweight = FloatField(required=False, default=1)
+    detector_mass = QuantityField(units='g')
+    num_detectors = IntField(required=False)
     livetime = QuantityField(units='s', required=False)
     version = DynamicField(required=False)
     files = SortedListField(StringField(), required=False)
