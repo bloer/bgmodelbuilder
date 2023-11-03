@@ -35,7 +35,7 @@ class Isotope(object):
         except (ValueError, TypeError): #arg1 is not an integer
             pass
         else:
-            self.symbol = ELEMENTS[Z].symbol
+            self.symbol = ELEMENTS[self.Z].symbol
             
         if not self.Z and isinstance(arg1, str):
             # see if we match either of the full name patterns
