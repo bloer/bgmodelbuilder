@@ -119,7 +119,7 @@ class EmissionSpec(Mappable):
         elif self.err:
             rate = AsymmetricError(rate, rate * self.err)
         else:
-            rate = AsymmetricError(rate)
+            rate = AsymmetricError(rate, 0)
         return rate * unit
 
 

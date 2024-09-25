@@ -13,7 +13,7 @@ class Histogram(object):
         self.hist = hist
         self.bin_edges = bin_edges
         if bin_edges is None:
-            self.bin_edges = np.arange(len(self.hist))
+            self.bin_edges = np.arange(len(self.hist)+1)
 
 
     def find_bin(self, x):

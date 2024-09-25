@@ -185,7 +185,10 @@ class HistogramField(UncertainQuantityField):
         return value
 
     def to_mongo(self, value):
-        result = QuantityField.to_mongo(self, value.hist)
+        try:
+            result = QuantityField.to_mongo(self, value.hist)
+        except AttributeError:
+            return None
         try:
             result['bins'] = value.bin_edges.m
             if not value.bin_edges.dimensionless:

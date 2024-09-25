@@ -32,9 +32,13 @@ class HitEffDB(SimulationsDB):
         #                    alias="hiteffdb")
 
     def genqueries(self, request, findnewdata=True):
-        hits = self.dbconfig.find_entries(source=request.spec.name,
-                                          location=request.simvolume,
-                                          distribution=request.spec.distribution)
+        request.query = dict(source=request.spec.name,
+                             location=request.simvolume,
+                             distribution=request.spec.distribution)
+
+        hits = self.dbconfig.find_entries(**request.query)
+        if not hits:
+            return request
         result = [request.clone(dataset=hit.id, query=hit.id,
                                 livetime=hit.get_livetime(request.emissionrate))
                   for hit in hits]

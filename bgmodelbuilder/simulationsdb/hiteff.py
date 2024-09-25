@@ -203,7 +203,8 @@ class HitEffDbConfig(Document):
                 if not testval.is_compatible_with(config.display_unit):
                     raise ValidationError(f"Entry {config.key} in {hiteff.key}"
                                           f" has wrong units {result.u}")
-                if convert:
+                if False and convert:
+                    # TODO: can't convert directly to display_unit!
                     entrylist[config.key] = result.to(config.display_unit)
         return hiteff
 
